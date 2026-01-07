@@ -1,0 +1,1682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tesla Telemetry - Video Player</title>
+    <script src="https://cdn.jsdelivr.net/npm/protobufjs@7.2.6/dist/protobuf.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Upload Screen */
+        .upload-screen {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .upload-screen h1 {
+            font-size: 2.5rem;
+            font-weight: 300;
+            letter-spacing: 4px;
+            background: linear-gradient(90deg, #e82127, #ff6b6b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .upload-screen p {
+            color: #666;
+            margin-bottom: 40px;
+        }
+
+        .upload-box {
+            border: 2px dashed #333;
+            border-radius: 16px;
+            padding: 80px 120px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(255,255,255,0.02);
+        }
+
+        .upload-box:hover {
+            border-color: #e82127;
+            background: rgba(232, 33, 39, 0.05);
+        }
+
+        .upload-box.dragover {
+            border-color: #e82127;
+            background: rgba(232, 33, 39, 0.1);
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .upload-box h3 {
+            font-weight: 400;
+            font-size: 1.2rem;
+            margin-bottom: 8px;
+        }
+
+        .upload-box span {
+            color: #666;
+            font-size: 0.85rem;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .loading-screen {
+            display: none;
+            text-align: center;
+        }
+
+        .loading-screen.active {
+            display: block;
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid #333;
+            border-top-color: #e82127;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Video Container */
+        .video-container {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: #000;
+            overflow: hidden;
+            flex-direction: column;
+        }
+
+        .video-container.active {
+            display: flex;
+        }
+
+        .video-wrapper {
+            flex: 1;
+            position: relative;
+            min-height: 0;
+        }
+
+        .video-wrapper video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        /* HUD Overlay */
+        .hud-overlay {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            z-index: 10;
+        }
+
+        .hud-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            position: relative;
+        }
+
+
+        .hud-bottom {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* HUD Card */
+        .hud-card {
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 16px 20px;
+        }
+
+        .hud-card-title {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: rgba(255,255,255,0.5);
+            margin-bottom: 8px;
+        }
+
+        /* Speed and G-Force Container */
+        .speed-gforce-container {
+            display: flex;
+            align-items: stretch;
+            gap: clamp(8px, 2vw, 16px);
+        }
+
+        /* Minimal G-Force (dot, trail, and rings) */
+        .gforce-minimal {
+            position: relative;
+            aspect-ratio: 1;
+        }
+
+        .gforce-minimal .gforce-ring {
+            position: absolute;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .gforce-minimal .gforce-ring.r1 {
+            width: 33%;
+            height: 33%;
+        }
+
+        .gforce-minimal .gforce-ring.r2 {
+            width: 66%;
+            height: 66%;
+        }
+
+        .gforce-minimal .gforce-ring.r3 {
+            width: 100%;
+            height: 100%;
+        }
+
+        .gforce-minimal .gforce-trail-canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .gforce-minimal .gforce-dot {
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            background: radial-gradient(circle, #ff6666 0%, #e82127 100%);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            transition: all 0.05s ease-out;
+            z-index: 2;
+        }
+
+        /* Speedometer - Centered & Transparent */
+        .speedometer-hud {
+            text-align: center;
+            width: clamp(140px, 35vw, 240px);
+            background: transparent;
+            backdrop-filter: none;
+            border: none;
+            padding: clamp(6px, 2vw, 12px) clamp(12px, 3vw, 24px);
+        }
+
+        .speed-display {
+            display: flex;
+            align-items: baseline;
+            justify-content: center;
+            gap: clamp(3px, 1vw, 6px);
+        }
+
+        .speed-number {
+            font-size: clamp(3rem, 10vw, 6rem);
+            font-weight: 300;
+            line-height: 1;
+            font-variant-numeric: tabular-nums;
+            transition: color 0.3s ease;
+        }
+
+
+        .speed-unit {
+            font-size: clamp(0.7rem, 2vw, 1.2rem);
+            font-weight: 500;
+            color: rgba(255,255,255,0.8);
+        }
+
+        /* Speed Sparkline */
+        .speed-sparkline-container {
+            margin-top: clamp(4px, 1.5vw, 8px);
+            height: clamp(30px, 8vw, 50px);
+            position: relative;
+        }
+
+        .speed-sparkline {
+            width: 100%;
+            height: 100%;
+        }
+
+        .speed-sparkline-path {
+            fill: none;
+            stroke-width: 2.5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .speed-sparkline-gradient-low { stop-color: #fff; }
+        .speed-sparkline-gradient-mid { stop-color: #fbbf24; }
+        .speed-sparkline-gradient-high { stop-color: #ef4444; }
+
+        .speed-sparkline-area {
+            opacity: 0.25;
+        }
+
+        .speed-pedal-bars {
+            margin-top: clamp(5px, 1.5vw, 10px);
+            display: flex;
+            flex-direction: column;
+            gap: clamp(3px, 1vw, 6px);
+        }
+
+        .speed-pedal-bar {
+            height: clamp(6px, 1.5vw, 10px);
+            background: rgba(255,255,255,0.15);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .speed-pedal-bar .pedal-bar {
+            height: 100%;
+            border-radius: 5px;
+            transition: width 0.05s ease-out;
+        }
+
+        /* Pedals */
+        .pedals-hud {
+            min-width: 180px;
+        }
+
+        .pedal-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .pedal-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .pedal-label {
+            font-size: 0.75rem;
+            width: 60px;
+            color: rgba(255,255,255,0.7);
+        }
+
+        .pedal-bar-bg {
+            flex: 1;
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .pedal-bar {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.05s ease-out;
+        }
+
+        .pedal-bar.throttle {
+            background: linear-gradient(90deg, #22c55e, #4ade80);
+            box-shadow: 0 0 12px rgba(34, 197, 94, 0.5);
+        }
+
+        .pedal-bar.brake {
+            background: linear-gradient(90deg, #e82127, #ff6b6b);
+            box-shadow: 0 0 12px rgba(232, 33, 39, 0.5);
+        }
+
+        .pedal-value {
+            font-size: 0.8rem;
+            width: 40px;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Status */
+        .status-hud {
+            min-width: 160px;
+        }
+
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .status-row:last-child {
+            border-bottom: none;
+        }
+
+        .status-label {
+            font-size: 0.75rem;
+            color: rgba(255,255,255,0.5);
+        }
+
+        .status-value {
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+
+        .status-indicator.active {
+            background: #4ade80;
+            box-shadow: 0 0 8px rgba(74, 222, 128, 0.6);
+        }
+
+        .status-indicator.inactive {
+            background: #555;
+        }
+
+        /* Controls Bar */
+        .controls-bar {
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(12px);
+            padding: 16px 20px;
+            border-top: 1px solid #222;
+        }
+
+        .controls-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .play-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(135deg, #e82127, #ff4444);
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 16px rgba(232, 33, 39, 0.4);
+            flex-shrink: 0;
+        }
+
+        .play-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .scrubber-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .time-display {
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.6);
+            min-width: 45px;
+        }
+
+        .scrubber {
+            flex: 1;
+            height: 4px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+            cursor: pointer;
+        }
+
+        .scrubber::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #fff;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+
+        .download-btn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .download-btn:hover {
+            background: rgba(255,255,255,0.2);
+            border-color: rgba(255,255,255,0.4);
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 12px;
+            font-size: 0.7rem;
+            color: rgba(255,255,255,0.4);
+        }
+
+        /* Recording indicator */
+        .rec-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: #e82127;
+        }
+
+        .rec-dot {
+            width: 6px;
+            height: 6px;
+            background: #e82127;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* Error message */
+        .error-message {
+            display: none;
+            background: rgba(232, 33, 39, 0.2);
+            border: 1px solid #e82127;
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin-top: 20px;
+            max-width: 500px;
+        }
+
+        .error-message.active {
+            display: block;
+        }
+
+        .error-message h4 {
+            color: #e82127;
+            margin-bottom: 8px;
+        }
+
+        .error-message p {
+            font-size: 0.85rem;
+            color: #aaa;
+        }
+
+        /* Collapsible Drawer */
+        .drawer-toggle {
+            background: none;
+            border: none;
+            color: rgba(255,255,255,0.6);
+            cursor: pointer;
+            padding: 4px 8px;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: color 0.2s ease;
+        }
+
+        .drawer-toggle:hover {
+            color: #fff;
+        }
+
+        .drawer-toggle .arrow {
+            transition: transform 0.3s ease;
+            font-size: 0.6rem;
+        }
+
+        .drawer-toggle.open .arrow {
+            transform: rotate(180deg);
+        }
+
+        .drawer-container {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease, padding 0.3s ease;
+            background: rgba(0, 0, 0, 0.95);
+            border-top: 1px solid #222;
+        }
+
+        .drawer-container.open {
+            max-height: 300px;
+        }
+
+        .drawer-content {
+            padding: 16px 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        .drawer-section {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .drawer-section-title {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: rgba(255,255,255,0.5);
+        }
+
+        .drawer-status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            font-size: 0.85rem;
+        }
+
+        .drawer-status-label {
+            color: rgba(255,255,255,0.5);
+        }
+
+        .drawer-status-value {
+            font-weight: 500;
+        }
+
+        .drawer-info-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            font-size: 0.75rem;
+            color: rgba(255,255,255,0.6);
+        }
+
+        .drawer-info-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .drawer-info-label {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: rgba(255,255,255,0.4);
+        }
+
+        .drawer-info-value {
+            font-family: 'SF Mono', Monaco, monospace;
+            color: rgba(255,255,255,0.8);
+        }
+    </style>
+</head>
+<body>
+    <!-- Upload Screen -->
+    <div class="upload-screen" id="uploadScreen">
+        <h1>TESLA TELEMETRY</h1>
+        <p>Video Player with HUD Overlay</p>
+        <div class="upload-box" id="uploadBox">
+            <div class="upload-icon">🎬</div>
+            <h3>Drop your Tesla dashcam MP4 here</h3>
+            <span>Requires firmware 2025.44.25+ with HW3+</span>
+            <input type="file" id="fileInput" accept="video/mp4,video/*">
+        </div>
+        <div class="error-message" id="errorMessage">
+            <h4>No telemetry found</h4>
+            <p>This video doesn't contain SEI metadata. Make sure it was recorded on firmware 2025.44.25 or later with HW3+.</p>
+        </div>
+    </div>
+
+    <!-- Loading Screen -->
+    <div class="loading-screen" id="loadingScreen">
+        <div class="spinner"></div>
+        <p>Extracting telemetry data...</p>
+    </div>
+
+    <!-- Video Container with HUD -->
+    <div class="video-container" id="videoContainer">
+        <div class="video-wrapper">
+            <video id="video" playsinline></video>
+
+            <div class="hud-overlay">
+            <!-- Top Row (empty, status moved to drawer) -->
+            <div class="hud-top">
+            </div>
+
+
+            <!-- Bottom Controls -->
+            <div class="hud-bottom">
+                <!-- Speed and G-Force Display -->
+                <div class="speed-gforce-container">
+                    <div class="gforce-minimal">
+                        <div class="gforce-ring r1"></div>
+                        <div class="gforce-ring r2"></div>
+                        <div class="gforce-ring r3"></div>
+                        <canvas class="gforce-trail-canvas" id="gforceTrailCanvas"></canvas>
+                        <div class="gforce-dot" id="gforceDot"></div>
+                    </div>
+                    <div class="hud-card speedometer-hud">
+                        <div class="speed-display">
+                            <span class="speed-number" id="speedValue">0</span>
+                            <span class="speed-unit">KM/H</span>
+                        </div>
+                    <!-- Speed Sparkline -->
+                    <div class="speed-sparkline-container">
+                        <svg class="speed-sparkline" id="speedSparkline" viewBox="0 0 200 40" preserveAspectRatio="none">
+                            <defs>
+                                <linearGradient id="sparklineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" class="speed-sparkline-gradient-low" />
+                                    <stop offset="50%" class="speed-sparkline-gradient-mid" />
+                                    <stop offset="100%" class="speed-sparkline-gradient-high" />
+                                </linearGradient>
+                                <linearGradient id="sparklineAreaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" stop-color="#fff" stop-opacity="0.3" />
+                                    <stop offset="100%" stop-color="#fff" stop-opacity="0" />
+                                </linearGradient>
+                            </defs>
+                            <path class="speed-sparkline-area" id="sparklineArea" fill="url(#sparklineAreaGradient)" />
+                            <path class="speed-sparkline-path" id="sparklinePath" stroke="url(#sparklineGradient)" />
+                        </svg>
+                    </div>
+                    <div class="speed-pedal-bars">
+                        <div class="speed-pedal-bar">
+                            <div class="pedal-bar throttle" id="throttleBar" style="width: 0%"></div>
+                        </div>
+                        <div class="speed-pedal-bar">
+                            <div class="pedal-bar brake" id="brakeBar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </div>
+
+        <div class="controls-bar">
+            <div class="controls-row">
+                <button class="play-btn" id="playBtn">▶</button>
+                <div class="scrubber-container">
+                    <span class="time-display" id="currentTime">0:00</span>
+                    <input type="range" class="scrubber" id="scrubber" min="0" max="100" value="0" step="0.1">
+                    <span class="time-display" id="totalTime">0:00</span>
+                </div>
+                <button class="drawer-toggle" id="drawerToggle">
+                    <span>Details</span>
+                    <span class="arrow">▼</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Collapsible Drawer -->
+        <div class="drawer-container" id="drawerContainer">
+            <div class="drawer-content">
+                <!-- Status Section -->
+                <div class="drawer-section">
+                    <div class="drawer-section-title">Status</div>
+                    <div class="drawer-status-row">
+                        <span class="drawer-status-label">Autopilot</span>
+                        <span class="drawer-status-value">
+                            <span class="status-indicator" id="apIndicator"></span>
+                            <span id="apStatus">OFF</span>
+                        </span>
+                    </div>
+                    <div class="drawer-status-row">
+                        <span class="drawer-status-label">Gear</span>
+                        <span class="drawer-status-value" id="gearStatus">D</span>
+                    </div>
+                    <div class="drawer-status-row">
+                        <span class="drawer-status-label">Steering</span>
+                        <span class="drawer-status-value"><span id="steeringValue">0</span>°</span>
+                    </div>
+                </div>
+
+                <!-- Frame Info Section -->
+                <div class="drawer-section">
+                    <div class="drawer-section-title">Playback</div>
+                    <div class="drawer-info-item">
+                        <span class="drawer-info-label">Frame</span>
+                        <span class="drawer-info-value" id="frameInfo">0 / 0</span>
+                    </div>
+                </div>
+
+                <!-- Coordinates Section -->
+                <div class="drawer-section">
+                    <div class="drawer-section-title">Location</div>
+                    <div class="drawer-info-item">
+                        <span class="drawer-info-label">Coordinates</span>
+                        <span class="drawer-info-value" id="locationInfo">--</span>
+                    </div>
+                </div>
+
+                <!-- Download Section -->
+                <div class="drawer-section">
+                    <div class="drawer-section-title">Export</div>
+                    <button class="download-btn" id="downloadBtn">Download CSV</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // Tesla Dashcam SEI Extractor
+        // Based on https://github.com/teslamotors/dashcam
+        // ============================================
+
+        // Protobuf schema for Tesla SEI metadata
+        const PROTO_SCHEMA = `
+            syntax = "proto3";
+
+            message SeiMetadata {
+                uint32 version = 1;
+                Gear gear_state = 2;
+                uint64 frame_seq_no = 3;
+                float vehicle_speed_mps = 4;
+                float accelerator_pedal_position = 5;
+                float steering_wheel_angle = 6;
+                bool blinker_on_left = 7;
+                bool blinker_on_right = 8;
+                bool brake_applied = 9;
+                AutopilotState autopilot_state = 10;
+                double latitude_deg = 11;
+                double longitude_deg = 12;
+                double heading_deg = 13;
+                double linear_acceleration_mps2_x = 14;
+                double linear_acceleration_mps2_y = 15;
+                double linear_acceleration_mps2_z = 16;
+            }
+
+            enum Gear {
+                GEAR_PARK = 0;
+                GEAR_DRIVE = 1;
+                GEAR_REVERSE = 2;
+                GEAR_NEUTRAL = 3;
+            }
+
+            enum AutopilotState {
+                NONE = 0;
+                SELF_DRIVING = 1;
+                AUTOSTEER = 2;
+                TACC = 3;
+            }
+        `;
+
+        let SeiMetadata = null;
+
+        // Initialize protobuf
+        async function initProtobuf() {
+            const root = protobuf.parse(PROTO_SCHEMA).root;
+            SeiMetadata = root.lookupType('SeiMetadata');
+        }
+
+        // MP4 Box Parser
+        class MP4Parser {
+            constructor(buffer) {
+                this.buffer = buffer;
+                this.view = new DataView(buffer);
+            }
+
+            findBox(start, end, name) {
+                let offset = start;
+                while (offset < end) {
+                    const size = this.view.getUint32(offset);
+                    const type = this.getString(offset + 4, 4);
+
+                    if (size === 0) break;
+                    if (size === 1) {
+                        // 64-bit size - skip for now
+                        offset += 16;
+                        continue;
+                    }
+
+                    if (type === name) {
+                        return { offset, size, type };
+                    }
+                    offset += size;
+                }
+                return null;
+            }
+
+            findBoxes(start, end, name) {
+                const boxes = [];
+                let offset = start;
+                while (offset < end) {
+                    const size = this.view.getUint32(offset);
+                    const type = this.getString(offset + 4, 4);
+
+                    if (size === 0) break;
+                    if (size === 1) {
+                        offset += 16;
+                        continue;
+                    }
+
+                    if (type === name) {
+                        boxes.push({ offset, size, type });
+                    }
+                    offset += size;
+                }
+                return boxes;
+            }
+
+            getString(offset, length) {
+                let str = '';
+                for (let i = 0; i < length; i++) {
+                    str += String.fromCharCode(this.view.getUint8(offset + i));
+                }
+                return str;
+            }
+
+            getTimescaleAndDurations() {
+                // Find moov box
+                const moov = this.findBox(0, this.buffer.byteLength, 'moov');
+                if (!moov) return null;
+
+                // Find first trak (video track)
+                const trak = this.findBox(moov.offset + 8, moov.offset + moov.size, 'trak');
+                if (!trak) return null;
+
+                // Find mdia
+                const mdia = this.findBox(trak.offset + 8, trak.offset + trak.size, 'mdia');
+                if (!mdia) return null;
+
+                // Find mdhd for timescale
+                const mdhd = this.findBox(mdia.offset + 8, mdia.offset + mdia.size, 'mdhd');
+                if (!mdhd) return null;
+
+                const mdhdOffset = mdhd.offset + 8;
+                const version = this.view.getUint8(mdhdOffset);
+                let timescale;
+
+                if (version === 0) {
+                    timescale = this.view.getUint32(mdhdOffset + 12);
+                } else {
+                    timescale = this.view.getUint32(mdhdOffset + 20);
+                }
+
+                // Find minf -> stbl -> stts for frame durations
+                const minf = this.findBox(mdia.offset + 8, mdia.offset + mdia.size, 'minf');
+                if (!minf) return { timescale, durations: [] };
+
+                const stbl = this.findBox(minf.offset + 8, minf.offset + minf.size, 'stbl');
+                if (!stbl) return { timescale, durations: [] };
+
+                const stts = this.findBox(stbl.offset + 8, stbl.offset + stbl.size, 'stts');
+                if (!stts) return { timescale, durations: [] };
+
+                // Parse stts
+                const sttsOffset = stts.offset + 8;
+                const entryCount = this.view.getUint32(sttsOffset + 4);
+                const durations = [];
+
+                let pos = sttsOffset + 8;
+                for (let i = 0; i < entryCount; i++) {
+                    const sampleCount = this.view.getUint32(pos);
+                    const sampleDelta = this.view.getUint32(pos + 4);
+                    for (let j = 0; j < sampleCount; j++) {
+                        durations.push(sampleDelta);
+                    }
+                    pos += 8;
+                }
+
+                return { timescale, durations };
+            }
+
+            getMdatInfo() {
+                const mdat = this.findBox(0, this.buffer.byteLength, 'mdat');
+                return mdat;
+            }
+        }
+
+        // SEI Extractor - FIXED to match Tesla's reference implementation
+        function extractSEI(buffer, mdatOffset, mdatSize) {
+            const view = new DataView(buffer);
+            const seiMessages = [];
+            let cursor = mdatOffset + 8;
+            const end = mdatOffset + mdatSize;
+
+            while (cursor + 4 <= end) {
+                // Read NAL unit size (4 bytes, big-endian)
+                const nalSize = view.getUint32(cursor);
+                cursor += 4;
+
+                if (nalSize < 2 || cursor + nalSize > view.byteLength) {
+                    cursor += Math.max(nalSize, 0);
+                    continue;
+                }
+
+                // Check NAL type (first byte & 0x1F) is 6 (SEI) AND
+                // payload type (second byte) is 5 (user_data_unregistered)
+                const nalType = view.getUint8(cursor) & 0x1F;
+                const payloadType = view.getUint8(cursor + 1);
+
+                if (nalType === 6 && payloadType === 5) {
+                    const seiData = new Uint8Array(buffer.slice(cursor, cursor + nalSize));
+                    const decoded = decodeSEI(seiData);
+                    if (decoded) {
+                        seiMessages.push(decoded);
+                    }
+                }
+
+                cursor += nalSize;
+            }
+
+            return seiMessages;
+        }
+
+        // Decode SEI message - FIXED to use Tesla's magic marker (0x42...0x69)
+        function decodeSEI(nal) {
+            if (!SeiMetadata || nal.length < 4) return null;
+
+            try {
+                // Search for magic marker: repeated 0x42 bytes followed by 0x69
+                // Start at offset 3 (after NAL header + payload type + size byte)
+                let i = 3;
+                while (i < nal.length && nal[i] === 0x42) i++;
+
+                // Validate: must have found at least one 0x42 and next byte must be 0x69
+                if (i <= 3 || i + 1 >= nal.length || nal[i] !== 0x69) {
+                    return null;
+                }
+
+                // Protobuf data starts after 0x69 marker, ends one byte before NAL end
+                const protobufData = removeEmulationPrevention(
+                    nal.subarray(i + 1, nal.length - 1)
+                );
+
+                if (protobufData.length < 4) return null;
+
+                // Decode protobuf
+                const message = SeiMetadata.decode(protobufData);
+                return SeiMetadata.toObject(message, {
+                    enums: String,
+                    defaults: true
+                });
+
+            } catch (e) {
+                return null;
+            }
+        }
+
+        // Remove H.264 emulation prevention bytes
+        function removeEmulationPrevention(data) {
+            const result = [];
+            for (let i = 0; i < data.length; i++) {
+                if (i >= 2 && data[i - 2] === 0x00 && data[i - 1] === 0x00 && data[i] === 0x03) {
+                    continue; // Skip emulation prevention byte
+                }
+                result.push(data[i]);
+            }
+            return new Uint8Array(result);
+        }
+
+        // ============================================
+        // UI Controller
+        // ============================================
+
+        let telemetryData = [];
+        let frameTimestamps = [];
+        let currentFrame = 0;
+        let videoFile = null;
+
+        // Speed history for sparkline (last N seconds worth of data)
+        const SPARKLINE_HISTORY_SECONDS = 8;
+        const SPARKLINE_POINTS = 60; // Number of points to show
+        let speedHistory = [];
+
+        // Session-wide min/max speed for sparkline scaling
+        let sessionMinSpeed = Infinity;
+        let sessionMaxSpeed = 0;
+
+        // Session-wide max throttle for scaling
+        let sessionMaxThrottle = 0;
+
+        // Session-wide max G-force for scaling
+        let sessionMaxGforce = 0;
+
+        // G-Force trail history
+        const GFORCE_TRAIL_LENGTH = 20;
+        let gforceHistory = [];
+        let gforceTrailCtx = null;
+
+        // DOM Elements
+        const uploadScreen = document.getElementById('uploadScreen');
+        const uploadBox = document.getElementById('uploadBox');
+        const fileInput = document.getElementById('fileInput');
+        const loadingScreen = document.getElementById('loadingScreen');
+        const videoContainer = document.getElementById('videoContainer');
+        const errorMessage = document.getElementById('errorMessage');
+        const video = document.getElementById('video');
+        const playBtn = document.getElementById('playBtn');
+        const scrubber = document.getElementById('scrubber');
+
+        // Upload handling
+        uploadBox.addEventListener('click', () => fileInput.click());
+        uploadBox.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadBox.classList.add('dragover');
+        });
+        uploadBox.addEventListener('dragleave', () => {
+            uploadBox.classList.remove('dragover');
+        });
+        uploadBox.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadBox.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file) processVideo(file);
+        });
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) processVideo(file);
+        });
+
+        async function processVideo(file) {
+            errorMessage.classList.remove('active');
+            uploadScreen.style.display = 'none';
+            loadingScreen.classList.add('active');
+
+            try {
+                // Initialize protobuf
+                await initProtobuf();
+
+                // Read file
+                const buffer = await file.arrayBuffer();
+
+                // Parse MP4
+                const parser = new MP4Parser(buffer);
+
+                // Get timing info
+                const timing = parser.getTimescaleAndDurations();
+                if (!timing) throw new Error('Could not parse video timing');
+
+                // Get mdat info
+                const mdat = parser.getMdatInfo();
+                if (!mdat) throw new Error('Could not find video data');
+
+                // Extract SEI messages
+                const seiMessages = extractSEI(buffer, mdat.offset, mdat.size);
+
+                if (seiMessages.length === 0) {
+                    throw new Error('No telemetry data found');
+                }
+
+                telemetryData = seiMessages;
+
+                // Calculate session-wide min/max speeds for sparkline scaling
+                sessionMinSpeed = Infinity;
+                sessionMaxSpeed = 0;
+                sessionMaxThrottle = 0;
+                sessionMaxGforce = 0;
+                for (const frame of telemetryData) {
+                    const speedKmh = (frame.vehicleSpeedMps || 0) * 3.6;
+                    if (speedKmh < sessionMinSpeed) sessionMinSpeed = speedKmh;
+                    if (speedKmh > sessionMaxSpeed) sessionMaxSpeed = speedKmh;
+                    const throttle = frame.acceleratorPedalPosition || 0;
+                    if (throttle > sessionMaxThrottle) sessionMaxThrottle = throttle;
+                    const gX = frame.linearAccelerationMps2X || 0;
+                    const gY = frame.linearAccelerationMps2Y || 0;
+                    const gTotal = Math.sqrt(gX * gX + gY * gY) / 9.81;
+                    if (gTotal > sessionMaxGforce) sessionMaxGforce = gTotal;
+                }
+                // Ensure we have valid values
+                if (sessionMinSpeed === Infinity) sessionMinSpeed = 0;
+                if (sessionMaxSpeed === 0) sessionMaxSpeed = 60;
+                if (sessionMaxThrottle === 0) sessionMaxThrottle = 50; // Fallback default
+                if (sessionMaxGforce === 0) sessionMaxGforce = 1.0; // Fallback default
+
+                // Build frame timestamps
+                frameTimestamps = [];
+                let time = 0;
+                for (let i = 0; i < timing.durations.length; i++) {
+                    frameTimestamps.push(time / timing.timescale);
+                    time += timing.durations[i];
+                }
+
+                // Create video URL
+                videoFile = URL.createObjectURL(file);
+                video.src = videoFile;
+
+                // Wait for video metadata
+                await new Promise((resolve, reject) => {
+                    video.onloadedmetadata = resolve;
+                    video.onerror = reject;
+                });
+
+                // Show video container
+                loadingScreen.classList.remove('active');
+                videoContainer.classList.add('active');
+
+                // Initialize G-Force trail canvas
+                const canvas = document.getElementById('gforceTrailCanvas');
+                gforceTrailCtx = canvas.getContext('2d');
+
+                // Resize canvas to match container
+                function resizeGforceCanvas() {
+                    const container = canvas.parentElement;
+                    const size = container.offsetHeight || container.offsetWidth || 150;
+                    canvas.width = size;
+                    canvas.height = size;
+                }
+                resizeGforceCanvas();
+                window.addEventListener('resize', resizeGforceCanvas);
+
+                // Setup controls
+                initializeControls();
+                updateDisplay(0);
+                video.playbackRate = 1;
+
+            } catch (error) {
+                console.error('Error processing video:', error);
+                loadingScreen.classList.remove('active');
+                uploadScreen.style.display = 'block';
+                errorMessage.classList.add('active');
+            }
+        }
+
+        let animationFrameId = null;
+        let lastDisplayedFrame = -1;
+
+        function initializeControls() {
+            // Set scrubber max to video duration
+            scrubber.max = video.duration;
+
+            // Update total time display
+            document.getElementById('totalTime').textContent = formatTime(video.duration);
+
+            // Use requestAnimationFrame for smooth 60fps updates
+            function frameLoop() {
+                const frame = findFrameAtTime(video.currentTime);
+
+                // Only update DOM if frame changed (performance optimization)
+                if (frame !== lastDisplayedFrame) {
+                    updateDisplay(frame);
+                    lastDisplayedFrame = frame;
+                }
+
+                // Always update scrubber and time for smooth seeking
+                scrubber.value = video.currentTime;
+                document.getElementById('currentTime').textContent = formatTime(video.currentTime);
+
+                animationFrameId = requestAnimationFrame(frameLoop);
+            }
+
+            // Start/stop animation loop based on video state
+            video.addEventListener('play', () => {
+                if (!animationFrameId) {
+                    frameLoop();
+                }
+            });
+
+            video.addEventListener('pause', () => {
+                if (animationFrameId) {
+                    cancelAnimationFrame(animationFrameId);
+                    animationFrameId = null;
+                }
+                // Update one last time to ensure correct frame shown
+                const frame = findFrameAtTime(video.currentTime);
+                updateDisplay(frame);
+                scrubber.value = video.currentTime;
+                document.getElementById('currentTime').textContent = formatTime(video.currentTime);
+            });
+
+            // Also update on seek (when paused)
+            video.addEventListener('seeked', () => {
+                const frame = findFrameAtTime(video.currentTime);
+                updateDisplay(frame);
+                lastDisplayedFrame = frame;
+                scrubber.value = video.currentTime;
+                document.getElementById('currentTime').textContent = formatTime(video.currentTime);
+
+                // Reset history on seek
+                rebuildHistoryFromSeek(frame);
+            });
+
+            // Play ended
+            video.addEventListener('ended', () => {
+                playBtn.textContent = '▶';
+                if (animationFrameId) {
+                    cancelAnimationFrame(animationFrameId);
+                    animationFrameId = null;
+                }
+            });
+        }
+
+        function rebuildHistoryFromSeek(currentFrameIndex) {
+            // Rebuild speed and g-force history from frames before current position
+            speedHistory = [];
+            gforceHistory = [];
+
+            const historyFrames = Math.min(SPARKLINE_POINTS, currentFrameIndex);
+            const startFrame = currentFrameIndex - historyFrames;
+
+            for (let i = startFrame; i <= currentFrameIndex; i++) {
+                if (i >= 0 && i < telemetryData.length) {
+                    const data = telemetryData[i];
+                    const speedKmh = (data.vehicleSpeedMps || 0) * 3.6;
+                    speedHistory.push(speedKmh);
+
+                    const gX = data.linearAccelerationMps2X || 0;
+                    const gY = data.linearAccelerationMps2Y || 0;
+                    gforceHistory.push({ x: gX, y: gY });
+                }
+            }
+
+            // Trim to max lengths
+            while (speedHistory.length > SPARKLINE_POINTS) speedHistory.shift();
+            while (gforceHistory.length > GFORCE_TRAIL_LENGTH) gforceHistory.shift();
+
+            updateSparkline();
+            drawGforceTrail();
+        }
+
+        function findFrameAtTime(time) {
+            // Binary search for frame at given time
+            let low = 0;
+            let high = frameTimestamps.length - 1;
+
+            while (low < high) {
+                const mid = Math.floor((low + high + 1) / 2);
+                if (frameTimestamps[mid] <= time) {
+                    low = mid;
+                } else {
+                    high = mid - 1;
+                }
+            }
+
+            // Clamp to telemetry data length
+            return Math.min(low, telemetryData.length - 1);
+        }
+
+        function updateDisplay(frameIndex) {
+            if (frameIndex < 0 || frameIndex >= telemetryData.length) return;
+
+            currentFrame = frameIndex;
+            const data = telemetryData[frameIndex];
+
+            // Speed (m/s to km/h)
+            const speedKmh = (data.vehicleSpeedMps || 0) * 3.6;
+            const speedElement = document.getElementById('speedValue');
+            speedElement.textContent = speedKmh.toFixed(1);
+
+            // Dynamic speed coloring (green at min, red at max)
+            const speedRange = sessionMaxSpeed - sessionMinSpeed;
+            const speedNormalized = speedRange > 0 ? (speedKmh - sessionMinSpeed) / speedRange : 0;
+            const speedColor = getSpeedColor(speedNormalized);
+            speedElement.style.color = speedColor;
+
+            // Update speed history
+            speedHistory.push(speedKmh);
+            while (speedHistory.length > SPARKLINE_POINTS) {
+                speedHistory.shift();
+            }
+            updateSparkline();
+
+            // G-Force (rotated 90 degrees clockwise: forward accel now goes up)
+            const gX = data.linearAccelerationMps2X || 0;
+            const gY = data.linearAccelerationMps2Y || 0;
+            const gTotal = Math.sqrt(gX * gX + gY * gY) / 9.81;
+
+            // Update G-Force history
+            gforceHistory.push({ x: gX, y: gY });
+            while (gforceHistory.length > GFORCE_TRAIL_LENGTH) {
+                gforceHistory.shift();
+            }
+            drawGforceTrail();
+
+            // Scale dot position to session max G-force
+            const maxG = sessionMaxGforce > 0 ? sessionMaxGforce : 1.0;
+            const dotX = 50 + (gX / 9.81 / maxG) * 45;
+            const dotY = 50 + (gY / 9.81 / maxG) * 45;
+
+            const gforceDot = document.getElementById('gforceDot');
+            gforceDot.style.left = `${Math.max(5, Math.min(95, dotX))}%`;
+            gforceDot.style.top = `${Math.max(5, Math.min(95, dotY))}%`;
+
+            // Throttle (scaled to session max)
+            const throttleRaw = data.acceleratorPedalPosition || 0;
+            const throttle = sessionMaxThrottle > 0 ? (throttleRaw / sessionMaxThrottle) * 100 : 0;
+            document.getElementById('throttleBar').style.width = `${Math.min(throttle, 100)}%`;
+
+            // Brake
+            const brakeOn = data.brakeApplied === true;
+            document.getElementById('brakeBar').style.width = brakeOn ? '100%' : '0%';
+
+            // Autopilot
+            const apState = data.autopilotState || 'NONE';
+            const apIndicator = document.getElementById('apIndicator');
+            const apStatus = document.getElementById('apStatus');
+
+            if (apState === 'AUTOSTEER' || apState === 'SELF_DRIVING') {
+                apIndicator.className = 'status-indicator active';
+                apStatus.textContent = apState === 'AUTOSTEER' ? 'AUTOSTEER' : 'FSD';
+            } else if (apState === 'TACC') {
+                apIndicator.className = 'status-indicator active';
+                apStatus.textContent = 'TACC';
+            } else {
+                apIndicator.className = 'status-indicator inactive';
+                apStatus.textContent = 'OFF';
+            }
+
+            // Gear
+            const gear = data.gearState || 'GEAR_DRIVE';
+            const gearMap = {
+                'GEAR_PARK': 'P',
+                'GEAR_DRIVE': 'D',
+                'GEAR_REVERSE': 'R',
+                'GEAR_NEUTRAL': 'N'
+            };
+            document.getElementById('gearStatus').textContent = gearMap[gear] || 'D';
+
+            // Steering
+            document.getElementById('steeringValue').textContent = (data.steeringWheelAngle || 0).toFixed(1);
+
+            // Frame info
+            document.getElementById('frameInfo').textContent = `${frameIndex + 1} / ${telemetryData.length}`;
+
+            // Location
+            const lat = data.latitudeDeg || 0;
+            const lng = data.longitudeDeg || 0;
+            if (lat !== 0 || lng !== 0) {
+                document.getElementById('locationInfo').textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+            }
+        }
+
+        function updateSparkline() {
+            if (speedHistory.length < 2) return;
+
+            const svg = document.getElementById('speedSparkline');
+            const pathElement = document.getElementById('sparklinePath');
+            const areaElement = document.getElementById('sparklineArea');
+
+            const width = 200;
+            const height = 40;
+            const padding = 2;
+
+            // Use session-wide min/max for scaling
+            const minSpeed = sessionMinSpeed;
+            const maxSpeed = sessionMaxSpeed;
+            const speedRange = maxSpeed - minSpeed;
+
+            // Generate path points (scaled between session min and max)
+            const points = speedHistory.map((speed, i) => {
+                const x = padding + (i / (SPARKLINE_POINTS - 1)) * (width - padding * 2);
+                // Normalize speed to 0-1 range based on session min/max
+                const normalizedSpeed = speedRange > 0 ? (speed - minSpeed) / speedRange : 0.5;
+                const y = height - padding - normalizedSpeed * (height - padding * 2);
+                return { x, y };
+            });
+
+            // Create smooth curve using cardinal spline
+            const linePath = `M ${points.map(p => `${p.x},${p.y}`).join(' L ')}`;
+            const areaPath = `${linePath} L ${points[points.length - 1].x},${height} L ${points[0].x},${height} Z`;
+
+            pathElement.setAttribute('d', linePath);
+            areaElement.setAttribute('d', areaPath);
+
+            // Update gradient based on current speed
+            const currentSpeed = speedHistory[speedHistory.length - 1] || 0;
+            const gradient = document.getElementById('sparklineGradient');
+
+            // Shift gradient colors based on speed
+            if (currentSpeed < 40) {
+                gradient.innerHTML = `
+                    <stop offset="0%" stop-color="rgba(255,255,255,0.3)" />
+                    <stop offset="100%" stop-color="#fff" />
+                `;
+            } else if (currentSpeed < 80) {
+                gradient.innerHTML = `
+                    <stop offset="0%" stop-color="rgba(255,255,255,0.3)" />
+                    <stop offset="100%" stop-color="#fbbf24" />
+                `;
+            } else if (currentSpeed < 120) {
+                gradient.innerHTML = `
+                    <stop offset="0%" stop-color="rgba(251,191,36,0.3)" />
+                    <stop offset="100%" stop-color="#f97316" />
+                `;
+            } else {
+                gradient.innerHTML = `
+                    <stop offset="0%" stop-color="rgba(249,115,22,0.3)" />
+                    <stop offset="100%" stop-color="#ef4444" />
+                `;
+            }
+        }
+
+        function drawGforceTrail() {
+            if (!gforceTrailCtx || gforceHistory.length < 2) return;
+
+            const canvas = gforceTrailCtx.canvas;
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const maxG = sessionMaxGforce > 0 ? sessionMaxGforce : 1.0;
+            const scale = (canvas.width / 2) * 0.9; // 90% of radius
+
+            // Clear canvas
+            gforceTrailCtx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw trail
+            gforceTrailCtx.beginPath();
+
+            for (let i = 0; i < gforceHistory.length; i++) {
+                const point = gforceHistory[i];
+                const x = centerX + (point.x / 9.81 / maxG) * scale;
+                const y = centerY + (point.y / 9.81 / maxG) * scale;
+
+                if (i === 0) {
+                    gforceTrailCtx.moveTo(x, y);
+                } else {
+                    gforceTrailCtx.lineTo(x, y);
+                }
+            }
+
+            // Create gradient for trail (fading from transparent to red)
+            const gradient = gforceTrailCtx.createLinearGradient(0, 0, canvas.width, canvas.height);
+            gradient.addColorStop(0, 'rgba(232, 33, 39, 0)');
+            gradient.addColorStop(1, 'rgba(232, 33, 39, 0.8)');
+
+            gforceTrailCtx.strokeStyle = gradient;
+            gforceTrailCtx.lineWidth = 2;
+            gforceTrailCtx.lineCap = 'round';
+            gforceTrailCtx.lineJoin = 'round';
+            gforceTrailCtx.stroke();
+
+            // Draw fading dots along the trail
+            for (let i = 0; i < gforceHistory.length; i++) {
+                const point = gforceHistory[i];
+                const x = centerX + (point.x / 9.81 / maxG) * scale;
+                const y = centerY + (point.y / 9.81 / maxG) * scale;
+
+                const alpha = (i / gforceHistory.length) * 0.5;
+                const radius = 1.5 + (i / gforceHistory.length) * 2.5;
+
+                gforceTrailCtx.beginPath();
+                gforceTrailCtx.arc(x, y, radius, 0, Math.PI * 2);
+                gforceTrailCtx.fillStyle = `rgba(232, 33, 39, ${alpha})`;
+                gforceTrailCtx.fill();
+            }
+        }
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        // Interpolate color from green (0) through yellow (0.5) to red (1)
+        function getSpeedColor(normalized) {
+            const t = Math.max(0, Math.min(1, normalized));
+
+            // Green -> Yellow -> Red gradient
+            let r, g, b;
+            if (t < 0.5) {
+                // Green to Yellow (0 to 0.5)
+                const t2 = t * 2;
+                r = Math.round(34 + (251 - 34) * t2);   // 34 -> 251
+                g = Math.round(197 + (191 - 197) * t2); // 197 -> 191
+                b = Math.round(94 + (36 - 94) * t2);    // 94 -> 36
+            } else {
+                // Yellow to Red (0.5 to 1)
+                const t2 = (t - 0.5) * 2;
+                r = Math.round(251 + (239 - 251) * t2); // 251 -> 239
+                g = Math.round(191 + (68 - 191) * t2);  // 191 -> 68
+                b = Math.round(36 + (68 - 36) * t2);    // 36 -> 68
+            }
+
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+
+        // Playback controls
+        playBtn.addEventListener('click', () => {
+            if (video.paused) {
+                video.play();
+                playBtn.textContent = '⏸';
+            } else {
+                video.pause();
+                playBtn.textContent = '▶';
+            }
+        });
+
+        scrubber.addEventListener('input', (e) => {
+            video.currentTime = parseFloat(e.target.value);
+        });
+
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                playBtn.click();
+            } else if (e.code === 'ArrowLeft') {
+                video.currentTime = Math.max(0, video.currentTime - 1);
+            } else if (e.code === 'ArrowRight') {
+                video.currentTime = Math.min(video.duration, video.currentTime + 1);
+            }
+        });
+
+        // Drawer toggle
+        const drawerToggle = document.getElementById('drawerToggle');
+        const drawerContainer = document.getElementById('drawerContainer');
+
+        drawerToggle.addEventListener('click', () => {
+            drawerToggle.classList.toggle('open');
+            drawerContainer.classList.toggle('open');
+        });
+
+        // CSV Download
+        document.getElementById('downloadBtn').addEventListener('click', downloadCSV);
+
+        function downloadCSV() {
+            if (telemetryData.length === 0) {
+                alert('No telemetry data to export');
+                return;
+            }
+
+            // CSV headers matching Tesla's official output format
+            const headers = [
+                'frame_seq_no',
+                'timestamp_sec',
+                'version',
+                'gear_state',
+                'vehicle_speed_mps',
+                'accelerator_pedal_position',
+                'steering_wheel_angle',
+                'blinker_on_left',
+                'blinker_on_right',
+                'brake_applied',
+                'autopilot_state',
+                'latitude_deg',
+                'longitude_deg',
+                'heading_deg',
+                'linear_acceleration_mps2_x',
+                'linear_acceleration_mps2_y',
+                'linear_acceleration_mps2_z'
+            ];
+
+            // Build CSV rows
+            const rows = [headers.join(',')];
+
+            for (let i = 0; i < telemetryData.length; i++) {
+                const d = telemetryData[i];
+                const timestamp = frameTimestamps[i] !== undefined ? frameTimestamps[i].toFixed(6) : '';
+
+                const row = [
+                    d.frameSeqNo || '',
+                    timestamp,
+                    d.version || '',
+                    d.gearState || '',
+                    d.vehicleSpeedMps || 0,
+                    d.acceleratorPedalPosition || 0,
+                    d.steeringWheelAngle || 0,
+                    d.blinkerOnLeft || false,
+                    d.blinkerOnRight || false,
+                    d.brakeApplied || false,
+                    d.autopilotState || '',
+                    d.latitudeDeg || 0,
+                    d.longitudeDeg || 0,
+                    d.headingDeg || 0,
+                    d.linearAccelerationMps2X || 0,
+                    d.linearAccelerationMps2Y || 0,
+                    d.linearAccelerationMps2Z || 0
+                ];
+
+                rows.push(row.join(','));
+            }
+
+            // Create and download file
+            const csvContent = rows.join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'telemetry_extracted.csv';
+            link.click();
+
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
