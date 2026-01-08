@@ -244,26 +244,27 @@
             z-index: 2;
         }
 
-        /* Speedometer - Centered & Transparent */
+        /* Speedometer - Horizontal layout with bars on left */
         .speedometer-hud {
-            text-align: center;
-            width: clamp(140px, 35vw, 240px);
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: clamp(8px, 2vw, 12px);
             background: transparent;
             backdrop-filter: none;
             border: none;
-            padding: clamp(6px, 2vw, 12px) clamp(12px, 3vw, 24px);
+            padding: 0;
         }
 
         .speed-display {
             display: flex;
             align-items: baseline;
-            justify-content: center;
             gap: clamp(3px, 1vw, 6px);
         }
 
         .speed-number {
-            font-size: clamp(3rem, 10vw, 6rem);
-            font-weight: 300;
+            font-size: clamp(1.8rem, 6vw, 4rem);
+            font-weight: 500;
             line-height: 1;
             font-variant-numeric: tabular-nums;
             transition: color 0.3s ease;
@@ -271,7 +272,7 @@
 
 
         .speed-unit {
-            font-size: clamp(0.7rem, 2vw, 1.2rem);
+            font-size: clamp(0.55rem, 1.5vw, 1rem);
             font-weight: 500;
             color: rgba(255,255,255,0.8);
         }
@@ -303,39 +304,57 @@
             opacity: 0.25;
         }
 
-        .speed-pedal-bars {
-            margin-top: clamp(5px, 1.5vw, 10px);
+        /* Vertical Pedal Bar (Tesla Energy Display style) */
+        .pedal-bar-vertical {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 6px;
+            height: 100%;
             display: flex;
             flex-direction: column;
-            gap: clamp(3px, 1vw, 6px);
+            z-index: 20;
+            /* Position is set dynamically via JS to match video content area */
         }
 
-        .speed-pedal-row {
-            display: flex;
-            align-items: center;
-            gap: clamp(4px, 1vw, 8px);
-        }
-
-        .speed-pedal-label {
-            font-size: clamp(0.5rem, 1.5vw, 0.65rem);
-            color: rgba(255, 255, 255, 0.6);
-            width: clamp(40px, 10vw, 50px);
-            text-align: right;
-            flex-shrink: 0;
-        }
-
-        .speed-pedal-bar {
+        .pedal-bar-vertical-top {
             flex: 1;
-            height: clamp(6px, 1.5vw, 10px);
-            background: rgba(255,255,255,0.15);
-            border-radius: 5px;
-            overflow: hidden;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            background: rgba(255, 255, 255, 0.1);
         }
 
-        .speed-pedal-bar .pedal-bar {
-            height: 100%;
-            border-radius: 5px;
-            transition: width 0.05s ease-out;
+        .pedal-bar-vertical-bottom {
+            flex: 1;
+            position: relative;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .pedal-bar-vertical-throttle {
+            width: 100%;
+            background: linear-gradient(to top, #22c55e, #4ade80);
+            box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+            transition: height 0.05s ease-out;
+        }
+
+        .pedal-bar-vertical-brake {
+            width: 100%;
+            background: linear-gradient(to bottom, #e82127, #ff6b6b);
+            box-shadow: 0 0 8px rgba(232, 33, 39, 0.6);
+            transition: height 0.05s ease-out;
+        }
+
+        .pedal-bar-vertical-center {
+            position: absolute;
+            left: 0;
+            top: 50%;
+            width: 100%;
+            height: 2px;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-50%);
+            z-index: 21;
         }
 
         /* Pedals */
@@ -769,6 +788,17 @@
         <div class="video-wrapper">
             <video id="video" playsinline></video>
 
+            <!-- Vertical Pedal Bar (Tesla Energy Display style) -->
+            <div class="pedal-bar-vertical" id="pedalBarVertical">
+                <div class="pedal-bar-vertical-top">
+                    <div class="pedal-bar-vertical-throttle" id="throttleBar" style="height: 0%"></div>
+                </div>
+                <div class="pedal-bar-vertical-bottom">
+                    <div class="pedal-bar-vertical-brake" id="brakeBar" style="height: 0%"></div>
+                </div>
+                <div class="pedal-bar-vertical-center"></div>
+            </div>
+
             <div class="hud-overlay">
             <!-- Top Row with Speed Display -->
             <div class="hud-top">
@@ -777,20 +807,6 @@
                     <div class="speed-display">
                         <span class="speed-number" id="speedValue">0</span>
                         <span class="speed-unit">KM/H</span>
-                    </div>
-                    <div class="speed-pedal-bars">
-                        <div class="speed-pedal-row">
-                            <span class="speed-pedal-label">Throttle</span>
-                            <div class="speed-pedal-bar">
-                                <div class="pedal-bar throttle" id="throttleBar" style="width: 0%"></div>
-                            </div>
-                        </div>
-                        <div class="speed-pedal-row">
-                            <span class="speed-pedal-label">Brake</span>
-                            <div class="speed-pedal-bar">
-                                <div class="pedal-bar brake" id="brakeBar" style="width: 0%"></div>
-                            </div>
-                        </div>
                     </div>
                 </div>
                 <!-- Camera Source Label -->
@@ -1389,6 +1405,7 @@
         function updateHudPosition() {
             const videoEl = document.getElementById('video');
             const hudOverlay = document.querySelector('.hud-overlay');
+            const pedalBar = document.getElementById('pedalBarVertical');
             const wrapper = document.querySelector('.video-wrapper');
 
             if (!videoEl || !hudOverlay || !wrapper || !videoEl.videoWidth) return;
@@ -1423,6 +1440,13 @@
             hudOverlay.style.top = offsetY + 'px';
             hudOverlay.style.width = renderedWidth + 'px';
             hudOverlay.style.height = renderedHeight + 'px';
+
+            // Position pedal bar at left edge of video content
+            if (pedalBar) {
+                pedalBar.style.left = offsetX + 'px';
+                pedalBar.style.top = offsetY + 'px';
+                pedalBar.style.height = renderedHeight + 'px';
+            }
         }
 
         function initializeControls() {
@@ -1581,14 +1605,15 @@
             gforceDot.style.left = `${Math.max(5, Math.min(95, dotX))}%`;
             gforceDot.style.top = `${Math.max(5, Math.min(95, dotY))}%`;
 
-            // Throttle (scaled to session max)
+            // Throttle (actual pedal position 0-100%)
             const throttleRaw = data.acceleratorPedalPosition || 0;
-            const throttle = sessionMaxThrottle > 0 ? (throttleRaw / sessionMaxThrottle) * 100 : 0;
-            document.getElementById('throttleBar').style.width = `${Math.min(throttle, 100)}%`;
+            // acceleratorPedalPosition is typically 0-100, clamp to be safe
+            const throttle = Math.min(Math.max(throttleRaw, 0), 100);
+            document.getElementById('throttleBar').style.height = `${throttle}%`;
 
-            // Brake
+            // Brake (boolean: on = 100%, off = 0%)
             const brakeOn = data.brakeApplied === true;
-            document.getElementById('brakeBar').style.width = brakeOn ? '100%' : '0%';
+            document.getElementById('brakeBar').style.height = brakeOn ? '100%' : '0%';
 
             // Autopilot
             const apState = data.autopilotState || 'NONE';
