@@ -124,26 +124,35 @@
 
         .video-wrapper {
             flex: 1;
-            position: relative;
             min-height: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        .video-wrapper video {
+        .video-content-box {
+            position: relative;
+            max-width: 100%;
+            max-height: 100%;
+            /* aspect-ratio set dynamically via JS */
+        }
+
+        .video-content-box video {
+            display: block;
             width: 100%;
             height: 100%;
-            object-fit: contain;
         }
 
         /* HUD Overlay */
         .hud-overlay {
             position: absolute;
+            inset: 0;
             pointer-events: none;
             padding: 20px;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
             z-index: 10;
-            /* Will be positioned dynamically to match video content area */
         }
 
         .hud-top {
@@ -329,12 +338,11 @@
             position: absolute;
             left: 0;
             top: 0;
+            bottom: 0;
             width: 6px;
-            height: 100%;
             display: flex;
             flex-direction: column;
             z-index: 20;
-            /* Position is set dynamically via JS to match video content area */
         }
 
         .pedal-bar-vertical-top {
@@ -806,20 +814,21 @@
     <!-- Video Container with HUD -->
     <div class="video-container" id="videoContainer">
         <div class="video-wrapper">
-            <video id="video" playsinline></video>
+            <div class="video-content-box" id="videoContentBox">
+                <video id="video" playsinline></video>
 
-            <!-- Vertical Pedal Bar (Tesla Energy Display style) -->
-            <div class="pedal-bar-vertical" id="pedalBarVertical">
-                <div class="pedal-bar-vertical-top">
-                    <div class="pedal-bar-vertical-throttle" id="throttleBar" style="height: 0%"></div>
+                <!-- Vertical Pedal Bar (Tesla Energy Display style) -->
+                <div class="pedal-bar-vertical" id="pedalBarVertical">
+                    <div class="pedal-bar-vertical-top">
+                        <div class="pedal-bar-vertical-throttle" id="throttleBar" style="height: 0%"></div>
+                    </div>
+                    <div class="pedal-bar-vertical-bottom">
+                        <div class="pedal-bar-vertical-brake" id="brakeBar" style="height: 0%"></div>
+                    </div>
+                    <div class="pedal-bar-vertical-center"></div>
                 </div>
-                <div class="pedal-bar-vertical-bottom">
-                    <div class="pedal-bar-vertical-brake" id="brakeBar" style="height: 0%"></div>
-                </div>
-                <div class="pedal-bar-vertical-center"></div>
-            </div>
 
-            <div class="hud-overlay">
+                <div class="hud-overlay">
             <!-- Top Row with Speed Display -->
             <div class="hud-top">
                 <!-- Speed Display -->
@@ -838,10 +847,11 @@
             </div>
 
 
-            <!-- Bottom Controls (empty now) -->
-            <div class="hud-bottom">
+                <!-- Bottom Controls (empty now) -->
+                <div class="hud-bottom">
+                </div>
             </div>
-        </div>
+            </div>
         </div>
 
         <div class="controls-bar">
@@ -1384,9 +1394,9 @@
                 // Detect and display camera source from filename
                 updateCameraLabel(file.name);
 
-                // Position HUD overlay to match video content area
-                updateHudPosition();
-                window.addEventListener('resize', updateHudPosition);
+                // Set aspect ratio on content box to match video
+                const contentBox = document.getElementById('videoContentBox');
+                contentBox.style.aspectRatio = `${video.videoWidth} / ${video.videoHeight}`;
 
                 // Initialize G-Force trail canvas
                 const canvas = document.getElementById('gforceTrailCanvas');
@@ -1417,54 +1427,6 @@
 
         let animationFrameId = null;
         let lastDisplayedFrame = -1;
-
-        // Calculate where the video content actually renders (accounting for object-fit: contain)
-        function updateHudPosition() {
-            const videoEl = document.getElementById('video');
-            const hudOverlay = document.querySelector('.hud-overlay');
-            const pedalBar = document.getElementById('pedalBarVertical');
-            const wrapper = document.querySelector('.video-wrapper');
-
-            if (!videoEl || !hudOverlay || !wrapper || !videoEl.videoWidth) return;
-
-            const wrapperRect = wrapper.getBoundingClientRect();
-            const containerWidth = wrapperRect.width;
-            const containerHeight = wrapperRect.height;
-
-            const videoWidth = videoEl.videoWidth;
-            const videoHeight = videoEl.videoHeight;
-
-            const containerRatio = containerWidth / containerHeight;
-            const videoRatio = videoWidth / videoHeight;
-
-            let renderedWidth, renderedHeight, offsetX, offsetY;
-
-            if (videoRatio > containerRatio) {
-                // Video is wider - letterbox top/bottom
-                renderedWidth = containerWidth;
-                renderedHeight = containerWidth / videoRatio;
-                offsetX = 0;
-                offsetY = (containerHeight - renderedHeight) / 2;
-            } else {
-                // Video is taller - letterbox left/right
-                renderedHeight = containerHeight;
-                renderedWidth = containerHeight * videoRatio;
-                offsetX = (containerWidth - renderedWidth) / 2;
-                offsetY = 0;
-            }
-
-            hudOverlay.style.left = offsetX + 'px';
-            hudOverlay.style.top = offsetY + 'px';
-            hudOverlay.style.width = renderedWidth + 'px';
-            hudOverlay.style.height = renderedHeight + 'px';
-
-            // Position pedal bar at left edge of video content
-            if (pedalBar) {
-                pedalBar.style.left = offsetX + 'px';
-                pedalBar.style.top = offsetY + 'px';
-                pedalBar.style.height = renderedHeight + 'px';
-            }
-        }
 
         function initializeControls() {
             // Set scrubber max to video duration
