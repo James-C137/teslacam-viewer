@@ -269,6 +269,12 @@
             display: flex;
             align-items: baseline;
             gap: clamp(3px, 1vw, 6px);
+            cursor: pointer;
+            pointer-events: auto;
+        }
+
+        .speed-display:hover {
+            opacity: 0.8;
         }
 
         .speed-number {
@@ -833,9 +839,9 @@
             <div class="hud-top">
                 <!-- Speed Display -->
                 <div class="hud-card speedometer-hud">
-                    <div class="speed-display">
+                    <div class="speed-display" id="speedDisplay" title="Click to toggle KM/H / MPH">
                         <span class="speed-number" id="speedValue">0</span>
-                        <span class="speed-unit">KM/H</span>
+                        <span class="speed-unit" id="speedUnit">KM/H</span>
                     </div>
                     <div class="autopilot-hud" id="autopilotHud">
                         <span class="status-indicator" id="apIndicatorHud"></span>
@@ -1218,6 +1224,7 @@
         let currentFrame = 0;
         let videoFile = null;
         let cameraSource = null;
+        let useMetric = true; // true = KM/H, false = MPH
 
         // Detect camera source from filename
         // Higher specificity matches take precedence (e.g., "left_pillar" > "left")
@@ -1545,10 +1552,11 @@
             currentFrame = frameIndex;
             const data = telemetryData[frameIndex];
 
-            // Speed (m/s to km/h)
+            // Speed (m/s to km/h or mph)
             const speedKmh = (data.vehicleSpeedMps || 0) * 3.6;
+            const displaySpeed = useMetric ? speedKmh : speedKmh * 0.621371;
             const speedElement = document.getElementById('speedValue');
-            speedElement.textContent = speedKmh.toFixed(1);
+            speedElement.textContent = displaySpeed.toFixed(1);
 
             // Dynamic speed coloring (green at min, red at max)
             const speedRange = sessionMaxSpeed - sessionMinSpeed;
@@ -1843,6 +1851,16 @@
         drawerToggle.addEventListener('click', () => {
             drawerToggle.classList.toggle('open');
             drawerContainer.classList.toggle('open');
+        });
+
+        // Speed unit toggle
+        document.getElementById('speedDisplay').addEventListener('click', () => {
+            useMetric = !useMetric;
+            document.getElementById('speedUnit').textContent = useMetric ? 'KM/H' : 'MPH';
+            // Update display with current frame data
+            if (telemetryData.length > 0) {
+                updateDisplay(currentFrame);
+            }
         });
 
         // CSV Download
