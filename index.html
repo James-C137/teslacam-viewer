@@ -851,48 +851,69 @@
         }
 
         /* ============================================ */
-        /* Camera Navigation Styles                    */
+        /* Camera Navigation Styles (Carousel)         */
         /* ============================================ */
         .camera-navigation {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 8px;
-            padding: 12px 0;
-            background: rgba(0, 0, 0, 0.9);
-            border-top: 1px solid #222;
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 15;
         }
 
         .camera-nav-label {
-            font-size: 0.75rem;
+            font-size: 0.65rem;
             text-transform: uppercase;
-            letter-spacing: 2px;
-            color: rgba(255, 255, 255, 0.7);
+            letter-spacing: 1.5px;
+            color: rgba(255, 255, 255, 0.6);
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+        }
+
+        .camera-nav-bottom {
+            position: absolute;
+            bottom: clamp(8px, 3vw, 16px);
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            pointer-events: auto;
         }
 
         .camera-nav-row {
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 10px;
         }
 
         .nav-arrow {
-            width: 32px;
-            height: 32px;
+            width: 28px;
+            height: 28px;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
             color: white;
-            font-size: 16px;
             cursor: pointer;
             transition: all 0.2s ease;
             display: flex;
             align-items: center;
             justify-content: center;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .nav-arrow svg {
+            width: 12px;
+            height: 12px;
         }
 
         .nav-arrow:hover {
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.6);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .nav-arrow:active {
+            transform: scale(0.95);
         }
 
         .nav-arrow:disabled {
@@ -902,25 +923,28 @@
 
         .camera-dots {
             display: flex;
-            gap: 8px;
+            gap: 10px;
         }
 
         .camera-dot {
             width: 8px;
             height: 8px;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.4);
             cursor: pointer;
             transition: all 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+            -webkit-tap-highlight-color: transparent;
         }
 
         .camera-dot.active {
             background: #e82127;
             transform: scale(1.25);
+            box-shadow: 0 0 6px rgba(232, 33, 39, 0.6);
         }
 
         .camera-dot:hover:not(.active) {
-            background: rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.6);
         }
 
         /* Hide camera navigation when only one camera */
@@ -995,6 +1019,24 @@
                 <div class="hud-bottom">
                 </div>
             </div>
+
+                <!-- Camera Navigation (carousel-style) -->
+                <div class="camera-navigation single-camera" id="cameraNavigation">
+                    <div class="camera-nav-bottom">
+                        <div class="camera-nav-row">
+                            <button class="nav-arrow" id="prevCamera" disabled>
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+                            </button>
+                            <div class="camera-dots" id="cameraDots">
+                                <!-- Dots generated dynamically -->
+                            </div>
+                            <button class="nav-arrow" id="nextCamera" disabled>
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+                            </button>
+                        </div>
+                        <span class="camera-nav-label" id="cameraNavLabel">Front</span>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -1021,22 +1063,6 @@
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
                     </button>
                 </div>
-            </div>
-        </div>
-
-        <!-- Camera Navigation -->
-        <div class="camera-navigation single-camera" id="cameraNavigation">
-            <span class="camera-nav-label" id="cameraNavLabel">Front</span>
-            <div class="camera-nav-row">
-                <button class="nav-arrow" id="prevCamera" disabled>
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
-                </button>
-                <div class="camera-dots" id="cameraDots">
-                    <!-- Dots generated dynamically -->
-                </div>
-                <button class="nav-arrow" id="nextCamera" disabled>
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
-                </button>
             </div>
         </div>
 
