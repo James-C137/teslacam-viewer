@@ -148,9 +148,18 @@
 
         .hud-top {
             display: flex;
-            justify-content: flex-start;
+            justify-content: space-between;
             align-items: flex-start;
             position: relative;
+        }
+
+        .camera-label {
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: rgba(255,255,255,0.7);
+            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
         }
 
 
@@ -784,6 +793,8 @@
                         </div>
                     </div>
                 </div>
+                <!-- Camera Source Label -->
+                <div class="camera-label" id="cameraLabel" style="display: none;"></div>
             </div>
 
 
@@ -1163,6 +1174,52 @@
         let frameTimestamps = [];
         let currentFrame = 0;
         let videoFile = null;
+        let cameraSource = null;
+
+        // Detect camera source from filename
+        // Higher specificity matches take precedence (e.g., "left_pillar" > "left")
+        function detectCameraSource(filename) {
+            const name = filename.toLowerCase().replace(/[-_]/g, ' ');
+
+            // Patterns ordered by specificity (most specific first)
+            const patterns = [
+                { pattern: /left\s*pillar/, label: 'Left Pillar' },
+                { pattern: /right\s*pillar/, label: 'Right Pillar' },
+                { pattern: /left\s*repeater/, label: 'Left Repeater' },
+                { pattern: /right\s*repeater/, label: 'Right Repeater' },
+                { pattern: /pillar\s*left/, label: 'Left Pillar' },
+                { pattern: /pillar\s*right/, label: 'Right Pillar' },
+                { pattern: /repeater\s*left/, label: 'Left Repeater' },
+                { pattern: /repeater\s*right/, label: 'Right Repeater' },
+                { pattern: /\bleft\b/, label: 'Left' },
+                { pattern: /\bright\b/, label: 'Right' },
+                { pattern: /\bfront\b/, label: 'Front' },
+                { pattern: /\bback\b/, label: 'Back' },
+                { pattern: /\brear\b/, label: 'Rear' },
+            ];
+
+            for (const { pattern, label } of patterns) {
+                if (pattern.test(name)) {
+                    return label;
+                }
+            }
+
+            return null;
+        }
+
+        function updateCameraLabel(filename) {
+            const label = detectCameraSource(filename);
+            const cameraLabelEl = document.getElementById('cameraLabel');
+
+            if (label) {
+                cameraLabelEl.textContent = label;
+                cameraLabelEl.style.display = 'block';
+                cameraSource = label;
+            } else {
+                cameraLabelEl.style.display = 'none';
+                cameraSource = null;
+            }
+        }
 
         // Speed history for sparkline (last N seconds worth of data)
         const SPARKLINE_HISTORY_SECONDS = 8;
@@ -1290,6 +1347,9 @@
                 // Show video container
                 loadingScreen.classList.remove('active');
                 videoContainer.classList.add('active');
+
+                // Detect and display camera source from filename
+                updateCameraLabel(file.name);
 
                 // Position HUD overlay to match video content area
                 updateHudPosition();
