@@ -244,12 +244,12 @@
             z-index: 2;
         }
 
-        /* Speedometer - Horizontal layout with bars on left */
+        /* Speedometer - Vertical layout */
         .speedometer-hud {
             display: flex;
-            flex-direction: row;
-            align-items: center;
-            gap: clamp(8px, 2vw, 12px);
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 2px;
             background: transparent;
             backdrop-filter: none;
             border: none;
@@ -275,6 +275,26 @@
             font-size: clamp(0.55rem, 1.5vw, 1rem);
             font-weight: 500;
             color: rgba(255,255,255,0.8);
+        }
+
+        /* Autopilot Status (below speed) */
+        .autopilot-hud {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: clamp(6px, 1.5vw, 12px);
+            font-size: clamp(0.6rem, 1.8vw, 0.9rem);
+            color: rgba(255,255,255,0.6);
+        }
+
+        .autopilot-hud .status-indicator {
+            width: 6px;
+            height: 6px;
+        }
+
+        .autopilot-hud .ap-label {
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         /* Speed Sparkline */
@@ -808,6 +828,10 @@
                         <span class="speed-number" id="speedValue">0</span>
                         <span class="speed-unit">KM/H</span>
                     </div>
+                    <div class="autopilot-hud" id="autopilotHud">
+                        <span class="status-indicator" id="apIndicatorHud"></span>
+                        <span class="ap-label" id="apStatusHud">OFF</span>
+                    </div>
                 </div>
                 <!-- Camera Source Label -->
                 <div class="camera-label" id="cameraLabel" style="display: none;"></div>
@@ -886,13 +910,6 @@
                 <!-- Status Section -->
                 <div class="drawer-section">
                     <div class="drawer-section-title">Status</div>
-                    <div class="drawer-status-row">
-                        <span class="drawer-status-label">Autopilot</span>
-                        <span class="drawer-status-value">
-                            <span class="status-indicator" id="apIndicator"></span>
-                            <span id="apStatus">OFF</span>
-                        </span>
-                    </div>
                     <div class="drawer-status-row">
                         <span class="drawer-status-label">Gear</span>
                         <span class="drawer-status-value" id="gearStatus">D</span>
@@ -1617,18 +1634,18 @@
 
             // Autopilot
             const apState = data.autopilotState || 'NONE';
-            const apIndicator = document.getElementById('apIndicator');
-            const apStatus = document.getElementById('apStatus');
+            const apIndicatorHud = document.getElementById('apIndicatorHud');
+            const apStatusHud = document.getElementById('apStatusHud');
 
             if (apState === 'AUTOSTEER' || apState === 'SELF_DRIVING') {
-                apIndicator.className = 'status-indicator active';
-                apStatus.textContent = apState === 'AUTOSTEER' ? 'AUTOSTEER' : 'FSD';
+                apIndicatorHud.className = 'status-indicator active';
+                apStatusHud.textContent = apState === 'AUTOSTEER' ? 'AUTOSTEER' : 'FSD';
             } else if (apState === 'TACC') {
-                apIndicator.className = 'status-indicator active';
-                apStatus.textContent = 'TACC';
+                apIndicatorHud.className = 'status-indicator active';
+                apStatusHud.textContent = 'TACC';
             } else {
-                apIndicator.className = 'status-indicator inactive';
-                apStatus.textContent = 'OFF';
+                apIndicatorHud.className = 'status-indicator inactive';
+                apStatusHud.textContent = 'OFF';
             }
 
             // Gear
