@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tesla Telemetry - Video Player</title>
     <script src="https://cdn.jsdelivr.net/npm/protobufjs@7.2.6/dist/protobuf.min.js"></script>
+    <!-- Leaflet for GPS minimap -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         * {
             margin: 0;
@@ -792,6 +795,138 @@
             width: 100%;
             height: 100%;
         }
+
+        /* ============================================ */
+        /* GPS Minimap Styles                          */
+        /* ============================================ */
+        .minimap-container {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 100;
+            pointer-events: auto;
+        }
+
+        .minimap {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            overflow: hidden;
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* Semi-transparent map tiles */
+        .minimap .leaflet-tile-pane {
+            opacity: 0.5 !important;
+        }
+
+        /* Leaflet overrides for minimap */
+        .minimap .leaflet-container {
+            background: transparent !important;
+        }
+
+        .minimap .leaflet-control-attribution,
+        .minimap .leaflet-control-zoom {
+            display: none !important;
+        }
+
+        /* Vehicle marker */
+        .vehicle-marker {
+            background: transparent !important;
+            border: none !important;
+        }
+        .vehicle-dot {
+            width: 12px;
+            height: 12px;
+            background: #e82127;
+            border: 2px solid white;
+            border-radius: 50%;
+            box-shadow: 0 0 8px rgba(232, 33, 39, 0.6);
+        }
+
+        /* Hide minimap when no GPS data */
+        .minimap-container.no-gps {
+            display: none;
+        }
+
+        /* ============================================ */
+        /* Camera Navigation Styles                    */
+        /* ============================================ */
+        .camera-navigation {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 0;
+            background: rgba(0, 0, 0, 0.9);
+            border-top: 1px solid #222;
+        }
+
+        .camera-nav-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .camera-nav-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .nav-arrow {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .nav-arrow:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .nav-arrow:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .camera-dots {
+            display: flex;
+            gap: 8px;
+        }
+
+        .camera-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .camera-dot.active {
+            background: #e82127;
+            transform: scale(1.25);
+        }
+
+        .camera-dot:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        /* Hide camera navigation when only one camera */
+        .camera-navigation.single-camera {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -801,9 +936,9 @@
         <p>Video Player with HUD Overlay</p>
         <div class="upload-box" id="uploadBox">
             <div class="upload-icon">🎬</div>
-            <h3>Drop your Tesla dashcam MP4 here</h3>
-            <span>Requires firmware 2025.44.25+ with HW3+</span>
-            <input type="file" id="fileInput" accept="video/mp4,video/*">
+            <h3>Drop your Tesla dashcam MP4s here</h3>
+            <span>Select multiple cameras (front, back, left, right) for multi-view</span>
+            <input type="file" id="fileInput" accept="video/mp4,video/*" multiple>
         </div>
         <div class="error-message" id="errorMessage">
             <h4>No telemetry found</h4>
@@ -822,6 +957,11 @@
         <div class="video-wrapper">
             <div class="video-content-box" id="videoContentBox">
                 <video id="video" playsinline></video>
+
+                <!-- GPS Minimap -->
+                <div class="minimap-container no-gps" id="minimapContainer">
+                    <div class="minimap" id="minimap"></div>
+                </div>
 
                 <!-- Vertical Pedal Bar (Tesla Energy Display style) -->
                 <div class="pedal-bar-vertical" id="pedalBarVertical">
@@ -848,8 +988,6 @@
                         <span class="ap-label" id="apStatusHud">OFF</span>
                     </div>
                 </div>
-                <!-- Camera Source Label -->
-                <div class="camera-label" id="cameraLabel" style="display: none;"></div>
             </div>
 
 
@@ -883,6 +1021,22 @@
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
                     </button>
                 </div>
+            </div>
+        </div>
+
+        <!-- Camera Navigation -->
+        <div class="camera-navigation single-camera" id="cameraNavigation">
+            <span class="camera-nav-label" id="cameraNavLabel">Front</span>
+            <div class="camera-nav-row">
+                <button class="nav-arrow" id="prevCamera" disabled>
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+                </button>
+                <div class="camera-dots" id="cameraDots">
+                    <!-- Dots generated dynamically -->
+                </div>
+                <button class="nav-arrow" id="nextCamera" disabled>
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+                </button>
             </div>
         </div>
 
@@ -1226,6 +1380,117 @@
         let cameraSource = null;
         let useMetric = true; // true = KM/H, false = MPH
 
+        // ============================================
+        // Multi-Camera Management
+        // ============================================
+        let loadedCameras = []; // Array of {file, url, label, telemetry, frameTimestamps}
+        let currentCameraIndex = 0;
+
+        // ============================================
+        // GPS Minimap Class
+        // ============================================
+        class GPSMinimap {
+            constructor(containerId) {
+                this.container = document.getElementById(containerId);
+                this.map = null;
+                this.routeLine = null;
+                this.vehicleMarker = null;
+                this.gpsPoints = [];
+                this.initialized = false;
+            }
+
+            initialize() {
+                if (this.initialized || !this.container) return;
+
+                try {
+                    // Create Leaflet map with a default view
+                    this.map = L.map(this.container, {
+                        zoomControl: false,
+                        attributionControl: false,
+                        dragging: false,
+                        scrollWheelZoom: false,
+                        doubleClickZoom: false,
+                        touchZoom: false,
+                        keyboard: false
+                    }).setView([0, 0], 2); // Set initial view
+
+                    // Always add tiles - they'll be hidden by CSS for transparent style
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                        maxZoom: 19,
+                        subdomains: 'abcd'
+                    }).addTo(this.map);
+
+                    // Create vehicle marker (Tesla red dot)
+                    const vehicleIcon = L.divIcon({
+                        className: 'vehicle-marker',
+                        html: '<div class="vehicle-dot"></div>',
+                        iconSize: [12, 12],
+                        iconAnchor: [6, 6]
+                    });
+                    this.vehicleMarker = L.marker([0, 0], { icon: vehicleIcon });
+
+                    // Route line style
+                    this.routeLine = L.polyline([], {
+                        color: '#e82127',
+                        weight: 2,
+                        opacity: 0.8
+                    });
+
+                    this.initialized = true;
+                } catch (e) {
+                    console.error('Failed to initialize minimap:', e);
+                }
+            }
+
+            buildRoute(telemetryFrames) {
+                if (!this.initialized || !this.map) return false;
+
+                // Extract GPS points from telemetry
+                this.gpsPoints = telemetryFrames
+                    .filter(f => f.latitudeDeg && f.longitudeDeg &&
+                           (f.latitudeDeg !== 0 || f.longitudeDeg !== 0))
+                    .map(f => [f.latitudeDeg, f.longitudeDeg]);
+
+                if (this.gpsPoints.length === 0) {
+                    return false;
+                }
+
+                // Draw route
+                this.routeLine.setLatLngs(this.gpsPoints);
+                this.routeLine.addTo(this.map);
+
+                // Add vehicle marker at first position
+                this.vehicleMarker.setLatLng(this.gpsPoints[0]);
+                this.vehicleMarker.addTo(this.map);
+
+                // Store bounds for later reference
+                this.routeBounds = this.routeLine.getBounds();
+
+                // Fit map to route bounds after a short delay to ensure container is rendered
+                setTimeout(() => {
+                    this.map.invalidateSize();
+                    this.map.fitBounds(this.routeBounds, { padding: [15, 15] });
+                }, 100);
+
+                return true;
+            }
+
+            updatePosition(lat, lng, heading = 0) {
+                if (!this.initialized || !lat || !lng || (lat === 0 && lng === 0)) return;
+
+                // Just update marker position - don't pan/zoom the map
+                this.vehicleMarker.setLatLng([lat, lng]);
+            }
+
+            hasGPSData() {
+                return this.gpsPoints.length > 0;
+            }
+        }
+
+        // Minimap instance
+        let minimap = null;
+        let hasGPSData = false;
+
         // Detect camera source from filename
         // Higher specificity matches take precedence (e.g., "left_pillar" > "left")
         function detectCameraSource(filename) {
@@ -1259,16 +1524,118 @@
 
         function updateCameraLabel(filename) {
             const label = detectCameraSource(filename);
-            const cameraLabelEl = document.getElementById('cameraLabel');
+            cameraSource = label || 'Camera';
 
-            if (label) {
-                cameraLabelEl.textContent = label;
-                cameraLabelEl.style.display = 'block';
-                cameraSource = label;
-            } else {
-                cameraLabelEl.style.display = 'none';
-                cameraSource = null;
+            // Update camera navigation label
+            const navLabel = document.getElementById('cameraNavLabel');
+            if (navLabel) {
+                navLabel.textContent = cameraSource;
             }
+        }
+
+        // ============================================
+        // Camera Navigation Functions
+        // ============================================
+        function initCameraNavigation() {
+            const dotsContainer = document.getElementById('cameraDots');
+            const navContainer = document.getElementById('cameraNavigation');
+            const prevBtn = document.getElementById('prevCamera');
+            const nextBtn = document.getElementById('nextCamera');
+
+            // Show/hide navigation based on camera count
+            if (loadedCameras.length <= 1) {
+                navContainer.classList.add('single-camera');
+                return;
+            }
+            navContainer.classList.remove('single-camera');
+
+            // Generate dots for loaded cameras
+            dotsContainer.innerHTML = loadedCameras.map((cam, i) =>
+                `<div class="camera-dot ${i === currentCameraIndex ? 'active' : ''}"
+                      data-index="${i}" title="${cam.label}"></div>`
+            ).join('');
+
+            // Dot click handlers
+            dotsContainer.querySelectorAll('.camera-dot').forEach(dot => {
+                dot.addEventListener('click', () => switchCamera(parseInt(dot.dataset.index)));
+            });
+
+            // Arrow button handlers
+            prevBtn.onclick = () => switchCamera(currentCameraIndex - 1);
+            nextBtn.onclick = () => switchCamera(currentCameraIndex + 1);
+
+            updateNavButtons();
+        }
+
+        function switchCamera(index) {
+            if (index < 0 || index >= loadedCameras.length) return;
+
+            const currentTime = video.currentTime;
+            const wasPlaying = !video.paused;
+
+            currentCameraIndex = index;
+            const camera = loadedCameras[index];
+
+            // Update video source
+            video.src = camera.url;
+
+            // Update telemetry data
+            telemetryData = camera.telemetry;
+            frameTimestamps = camera.frameTimestamps;
+
+            // Update session stats
+            recalculateSessionStats();
+
+            // Wait for video to load then restore position
+            video.onloadedmetadata = () => {
+                video.currentTime = Math.min(currentTime, video.duration);
+                if (wasPlaying) {
+                    video.play();
+                }
+
+                // Rebuild history
+                const frame = findFrameAtTime(video.currentTime);
+                rebuildHistoryFromSeek(frame);
+            };
+
+            // Update UI
+            document.getElementById('cameraNavLabel').textContent = camera.label;
+            document.querySelectorAll('.camera-dot').forEach((dot, i) => {
+                dot.classList.toggle('active', i === index);
+            });
+
+            updateNavButtons();
+        }
+
+        function updateNavButtons() {
+            const prevBtn = document.getElementById('prevCamera');
+            const nextBtn = document.getElementById('nextCamera');
+            prevBtn.disabled = currentCameraIndex === 0;
+            nextBtn.disabled = currentCameraIndex === loadedCameras.length - 1;
+        }
+
+        function recalculateSessionStats() {
+            sessionMinSpeed = Infinity;
+            sessionMaxSpeed = 0;
+            sessionMaxThrottle = 0;
+            sessionMaxGforce = 0;
+
+            for (const frame of telemetryData) {
+                const speedKmh = (frame.vehicleSpeedMps || 0) * 3.6;
+                if (speedKmh < sessionMinSpeed) sessionMinSpeed = speedKmh;
+                if (speedKmh > sessionMaxSpeed) sessionMaxSpeed = speedKmh;
+                const throttle = frame.acceleratorPedalPosition || 0;
+                if (throttle > sessionMaxThrottle) sessionMaxThrottle = throttle;
+                const gX = frame.linearAccelerationMps2X || 0;
+                const gY = frame.linearAccelerationMps2Y || 0;
+                const gTotal = Math.sqrt(gX * gX + gY * gY) / 9.81;
+                if (gTotal > sessionMaxGforce) sessionMaxGforce = gTotal;
+            }
+
+            if (sessionMinSpeed === Infinity) sessionMinSpeed = 0;
+            if (sessionMaxSpeed === 0) sessionMaxSpeed = 60;
+            if (sessionMaxThrottle === 0) sessionMaxThrottle = 50;
+            if (sessionMaxGforce === 0) sessionMaxGforce = 1.0;
         }
 
         // Speed history for sparkline (last N seconds worth of data)
@@ -1314,15 +1681,49 @@
         uploadBox.addEventListener('drop', (e) => {
             e.preventDefault();
             uploadBox.classList.remove('dragover');
-            const file = e.dataTransfer.files[0];
-            if (file) processVideo(file);
+            const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('video/'));
+            if (files.length > 0) processVideos(files);
         });
         fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) processVideo(file);
+            const files = Array.from(e.target.files);
+            if (files.length > 0) processVideos(files);
         });
 
-        async function processVideo(file) {
+        // Process a single video file and return camera data
+        async function processSingleVideo(file) {
+            const buffer = await file.arrayBuffer();
+            const parser = new MP4Parser(buffer);
+
+            const timing = parser.getTimescaleAndDurations();
+            if (!timing) throw new Error('Could not parse video timing');
+
+            const mdat = parser.getMdatInfo();
+            if (!mdat) throw new Error('Could not find video data');
+
+            const seiMessages = extractSEI(buffer, mdat.offset, mdat.size);
+            if (seiMessages.length === 0) {
+                throw new Error('No telemetry data found');
+            }
+
+            // Build frame timestamps
+            const timestamps = [];
+            let time = 0;
+            for (let i = 0; i < timing.durations.length; i++) {
+                timestamps.push(time / timing.timescale);
+                time += timing.durations[i];
+            }
+
+            return {
+                file: file,
+                url: URL.createObjectURL(file),
+                label: detectCameraSource(file.name) || 'Unknown',
+                telemetry: seiMessages,
+                frameTimestamps: timestamps
+            };
+        }
+
+        // Process multiple video files
+        async function processVideos(files) {
             errorMessage.classList.remove('active');
             uploadScreen.style.display = 'none';
             loadingScreen.classList.add('active');
@@ -1331,62 +1732,46 @@
                 // Initialize protobuf
                 await initProtobuf();
 
-                // Read file
-                const buffer = await file.arrayBuffer();
+                // Reset loaded cameras
+                loadedCameras = [];
+                currentCameraIndex = 0;
 
-                // Parse MP4
-                const parser = new MP4Parser(buffer);
-
-                // Get timing info
-                const timing = parser.getTimescaleAndDurations();
-                if (!timing) throw new Error('Could not parse video timing');
-
-                // Get mdat info
-                const mdat = parser.getMdatInfo();
-                if (!mdat) throw new Error('Could not find video data');
-
-                // Extract SEI messages
-                const seiMessages = extractSEI(buffer, mdat.offset, mdat.size);
-
-                if (seiMessages.length === 0) {
-                    throw new Error('No telemetry data found');
+                // Process each file
+                for (const file of files) {
+                    try {
+                        const cameraData = await processSingleVideo(file);
+                        loadedCameras.push(cameraData);
+                    } catch (e) {
+                        console.warn(`Failed to process ${file.name}:`, e.message);
+                    }
                 }
 
-                telemetryData = seiMessages;
-
-                // Calculate session-wide min/max speeds for sparkline scaling
-                sessionMinSpeed = Infinity;
-                sessionMaxSpeed = 0;
-                sessionMaxThrottle = 0;
-                sessionMaxGforce = 0;
-                for (const frame of telemetryData) {
-                    const speedKmh = (frame.vehicleSpeedMps || 0) * 3.6;
-                    if (speedKmh < sessionMinSpeed) sessionMinSpeed = speedKmh;
-                    if (speedKmh > sessionMaxSpeed) sessionMaxSpeed = speedKmh;
-                    const throttle = frame.acceleratorPedalPosition || 0;
-                    if (throttle > sessionMaxThrottle) sessionMaxThrottle = throttle;
-                    const gX = frame.linearAccelerationMps2X || 0;
-                    const gY = frame.linearAccelerationMps2Y || 0;
-                    const gTotal = Math.sqrt(gX * gX + gY * gY) / 9.81;
-                    if (gTotal > sessionMaxGforce) sessionMaxGforce = gTotal;
-                }
-                // Ensure we have valid values
-                if (sessionMinSpeed === Infinity) sessionMinSpeed = 0;
-                if (sessionMaxSpeed === 0) sessionMaxSpeed = 60;
-                if (sessionMaxThrottle === 0) sessionMaxThrottle = 50; // Fallback default
-                if (sessionMaxGforce === 0) sessionMaxGforce = 1.0; // Fallback default
-
-                // Build frame timestamps
-                frameTimestamps = [];
-                let time = 0;
-                for (let i = 0; i < timing.durations.length; i++) {
-                    frameTimestamps.push(time / timing.timescale);
-                    time += timing.durations[i];
+                if (loadedCameras.length === 0) {
+                    throw new Error('No valid telemetry data found in any file');
                 }
 
-                // Create video URL
-                videoFile = URL.createObjectURL(file);
+                // Sort cameras by label for consistent ordering (Unknown goes to end)
+                const cameraOrder = ['Front', 'Left Repeater', 'Left Pillar', 'Left', 'Back', 'Rear', 'Right', 'Right Pillar', 'Right Repeater'];
+                loadedCameras.sort((a, b) => {
+                    // Unknown always goes to the end
+                    if (a.label === 'Unknown' && b.label !== 'Unknown') return 1;
+                    if (b.label === 'Unknown' && a.label !== 'Unknown') return -1;
+                    if (a.label === 'Unknown' && b.label === 'Unknown') return 0;
+
+                    const aIdx = cameraOrder.findIndex(c => a.label.includes(c));
+                    const bIdx = cameraOrder.findIndex(c => b.label.includes(c));
+                    return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
+                });
+
+                // Use first camera as primary
+                const primaryCamera = loadedCameras[0];
+                telemetryData = primaryCamera.telemetry;
+                frameTimestamps = primaryCamera.frameTimestamps;
+                videoFile = primaryCamera.url;
                 video.src = videoFile;
+
+                // Calculate session stats
+                recalculateSessionStats();
 
                 // Wait for video metadata
                 await new Promise((resolve, reject) => {
@@ -1398,10 +1783,10 @@
                 loadingScreen.classList.remove('active');
                 videoContainer.classList.add('active');
 
-                // Detect and display camera source from filename
-                updateCameraLabel(file.name);
+                // Update camera label
+                updateCameraLabel(primaryCamera.file.name);
 
-                // Set aspect ratio on content box to match video
+                // Set aspect ratio
                 const contentBox = document.getElementById('videoContentBox');
                 contentBox.style.aspectRatio = `${video.videoWidth} / ${video.videoHeight}`;
 
@@ -1409,7 +1794,6 @@
                 const canvas = document.getElementById('gforceTrailCanvas');
                 gforceTrailCtx = canvas.getContext('2d');
 
-                // Resize canvas to match container
                 function resizeGforceCanvas() {
                     const container = canvas.parentElement;
                     const size = container.offsetHeight || container.offsetWidth || 150;
@@ -1418,6 +1802,12 @@
                 }
                 resizeGforceCanvas();
                 window.addEventListener('resize', resizeGforceCanvas);
+
+                // Initialize GPS minimaps
+                initializeMinimaps();
+
+                // Initialize camera navigation
+                initCameraNavigation();
 
                 // Setup controls
                 initializeControls();
@@ -1429,6 +1819,35 @@
                 loadingScreen.classList.remove('active');
                 uploadScreen.style.display = 'block';
                 errorMessage.classList.add('active');
+            }
+        }
+
+        // Initialize GPS minimap
+        function initializeMinimaps() {
+            const minimapContainer = document.getElementById('minimapContainer');
+
+            // Create minimap instance
+            minimap = new GPSMinimap('minimap');
+            minimap.initialize();
+
+            // Build route from telemetry (use first camera with GPS data)
+            hasGPSData = false;
+            for (const camera of loadedCameras) {
+                const hasGPS = camera.telemetry.some(f =>
+                    f.latitudeDeg && f.longitudeDeg &&
+                    (f.latitudeDeg !== 0 || f.longitudeDeg !== 0)
+                );
+                if (hasGPS) {
+                    hasGPSData = minimap.buildRoute(camera.telemetry);
+                    break;
+                }
+            }
+
+            // Show/hide minimap container based on GPS data
+            if (hasGPSData) {
+                minimapContainer.classList.remove('no-gps');
+            } else {
+                minimapContainer.classList.add('no-gps');
             }
         }
 
@@ -1640,6 +2059,11 @@
             if (lat !== 0 || lng !== 0) {
                 document.getElementById('locationInfo').textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
             }
+
+            // Update GPS minimap
+            if (hasGPSData && minimap) {
+                minimap.updatePosition(lat, lng, data.headingDeg || 0);
+            }
         }
 
         function updateSparkline() {
@@ -1841,6 +2265,18 @@
                 prevFrameBtn.click();
             } else if (e.code === 'Period') {
                 nextFrameBtn.click();
+            } else if (e.code === 'BracketLeft') {
+                // [ key - previous camera
+                switchCamera(currentCameraIndex - 1);
+            } else if (e.code === 'BracketRight') {
+                // ] key - next camera
+                switchCamera(currentCameraIndex + 1);
+            } else if (e.key >= '1' && e.key <= '9') {
+                // Number keys 1-9 - switch to camera by index
+                const camIndex = parseInt(e.key) - 1;
+                if (camIndex < loadedCameras.length) {
+                    switchCamera(camIndex);
+                }
             }
         });
 
