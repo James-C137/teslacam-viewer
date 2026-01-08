@@ -1390,21 +1390,151 @@
         }
 
         // ============================================
-        // UI Controller
+        // Centralized State Management
         // ============================================
 
-        let telemetryData = [];
-        let frameTimestamps = [];
-        let currentFrame = 0;
-        let videoFile = null;
-        let cameraSource = null;
-        let useMetric = true; // true = KM/H, false = MPH
+        const state = {
+            // Core data
+            cameras: [],           // Array of {file, url, label, telemetry, frameTimestamps}
+            currentCameraIndex: 0,
+            currentFrame: 0,
+
+            // UI preferences
+            useMetric: true,
+
+            // Visualization history
+            speedHistory: [],
+            gforceHistory: [],
+
+            // Playback tracking
+            lastDisplayedFrame: -1,
+
+            // Cached derived state (invalidated on camera switch)
+            _statsCache: null,
+            _statsCameraIndex: -1,
+        };
+
+        // Constants
+        const SPARKLINE_HISTORY_SECONDS = 8;
+        const SPARKLINE_POINTS = 60;
+        const GFORCE_TRAIL_LENGTH = 20;
 
         // ============================================
-        // Multi-Camera Management
+        // State Accessors (Getters)
         // ============================================
-        let loadedCameras = []; // Array of {file, url, label, telemetry, frameTimestamps}
-        let currentCameraIndex = 0;
+
+        function getCurrentCamera() {
+            return state.cameras[state.currentCameraIndex];
+        }
+
+        function getTelemetry() {
+            return getCurrentCamera()?.telemetry || [];
+        }
+
+        function getFrameTimestamps() {
+            return getCurrentCamera()?.frameTimestamps || [];
+        }
+
+        function getCurrentFrameData() {
+            return getTelemetry()[state.currentFrame] || null;
+        }
+
+        function getSessionStats() {
+            // Compute and cache (invalidate on camera switch)
+            if (!state._statsCache || state._statsCameraIndex !== state.currentCameraIndex) {
+                state._statsCache = computeSessionStats(getTelemetry());
+                state._statsCameraIndex = state.currentCameraIndex;
+            }
+            return state._statsCache;
+        }
+
+        function computeSessionStats(telemetry) {
+            let minSpeed = Infinity;
+            let maxSpeed = 0;
+            let maxThrottle = 0;
+            let maxGforce = 0;
+
+            for (const frame of telemetry) {
+                const speedKmh = (frame.vehicleSpeedMps || 0) * 3.6;
+                if (speedKmh < minSpeed) minSpeed = speedKmh;
+                if (speedKmh > maxSpeed) maxSpeed = speedKmh;
+
+                const throttle = frame.acceleratorPedalPosition || 0;
+                if (throttle > maxThrottle) maxThrottle = throttle;
+
+                const gX = frame.linearAccelerationMps2X || 0;
+                const gY = frame.linearAccelerationMps2Y || 0;
+                const gTotal = Math.sqrt(gX * gX + gY * gY) / 9.81;
+                if (gTotal > maxGforce) maxGforce = gTotal;
+            }
+
+            return {
+                minSpeed: minSpeed === Infinity ? 0 : minSpeed,
+                maxSpeed: maxSpeed || 60,
+                maxThrottle: maxThrottle || 50,
+                maxGforce: maxGforce || 1.0,
+            };
+        }
+
+        function hasGPSData() {
+            return getTelemetry().some(f =>
+                f.latitudeDeg && f.longitudeDeg &&
+                (f.latitudeDeg !== 0 || f.longitudeDeg !== 0)
+            );
+        }
+
+        // ============================================
+        // State Mutations
+        // ============================================
+
+        function setCurrentCamera(index) {
+            if (index < 0 || index >= state.cameras.length) return null;
+            state.currentCameraIndex = index;
+            state._statsCache = null; // Invalidate derived state
+            return getCurrentCamera();
+        }
+
+        function setCurrentFrame(frameIndex) {
+            const max = getTelemetry().length - 1;
+            state.currentFrame = Math.max(0, Math.min(frameIndex, max));
+        }
+
+        function addSpeedToHistory(speedKmh) {
+            state.speedHistory.push(speedKmh);
+            if (state.speedHistory.length > SPARKLINE_POINTS) {
+                state.speedHistory.shift();
+            }
+        }
+
+        function addGforceToHistory(gX, gY) {
+            state.gforceHistory.push({ x: gX, y: gY });
+            if (state.gforceHistory.length > GFORCE_TRAIL_LENGTH) {
+                state.gforceHistory.shift();
+            }
+        }
+
+        function rebuildHistory(fromFrame) {
+            state.speedHistory = [];
+            state.gforceHistory = [];
+            const telemetry = getTelemetry();
+            const start = Math.max(0, fromFrame - SPARKLINE_POINTS);
+
+            for (let i = start; i <= fromFrame && i < telemetry.length; i++) {
+                const d = telemetry[i];
+                state.speedHistory.push((d.vehicleSpeedMps || 0) * 3.6);
+                state.gforceHistory.push({
+                    x: d.linearAccelerationMps2X || 0,
+                    y: d.linearAccelerationMps2Y || 0
+                });
+            }
+        }
+
+        // ============================================
+        // Runtime Instances (not state)
+        // ============================================
+
+        let gforceTrailCtx = null;  // Canvas 2D context
+        let minimap = null;         // GPSMinimap instance
 
         // ============================================
         // GPS Minimap Class
@@ -1507,10 +1637,6 @@
             }
         }
 
-        // Minimap instance
-        let minimap = null;
-        let hasGPSData = false;
-
         // Detect camera source from filename
         // Higher specificity matches take precedence (e.g., "left_pillar" > "left")
         function detectCameraSource(filename) {
@@ -1543,13 +1669,10 @@
         }
 
         function updateCameraLabel(filename) {
-            const label = detectCameraSource(filename);
-            cameraSource = label || 'Camera';
-
-            // Update camera navigation label
+            const label = detectCameraSource(filename) || 'Camera';
             const navLabel = document.getElementById('cameraNavLabel');
             if (navLabel) {
-                navLabel.textContent = cameraSource;
+                navLabel.textContent = label;
             }
         }
 
@@ -1563,15 +1686,15 @@
             const nextBtn = document.getElementById('nextCamera');
 
             // Show/hide navigation based on camera count
-            if (loadedCameras.length <= 1) {
+            if (state.cameras.length <= 1) {
                 navContainer.classList.add('single-camera');
                 return;
             }
             navContainer.classList.remove('single-camera');
 
             // Generate dots for loaded cameras
-            dotsContainer.innerHTML = loadedCameras.map((cam, i) =>
-                `<div class="camera-dot ${i === currentCameraIndex ? 'active' : ''}"
+            dotsContainer.innerHTML = state.cameras.map((cam, i) =>
+                `<div class="camera-dot ${i === state.currentCameraIndex ? 'active' : ''}"
                       data-index="${i}" title="${cam.label}"></div>`
             ).join('');
 
@@ -1581,30 +1704,21 @@
             });
 
             // Arrow button handlers
-            prevBtn.onclick = () => switchCamera(currentCameraIndex - 1);
-            nextBtn.onclick = () => switchCamera(currentCameraIndex + 1);
+            prevBtn.onclick = () => switchCamera(state.currentCameraIndex - 1);
+            nextBtn.onclick = () => switchCamera(state.currentCameraIndex + 1);
 
             updateNavButtons();
         }
 
         function switchCamera(index) {
-            if (index < 0 || index >= loadedCameras.length) return;
+            const camera = setCurrentCamera(index);
+            if (!camera) return;
 
             const currentTime = video.currentTime;
             const wasPlaying = !video.paused;
 
-            currentCameraIndex = index;
-            const camera = loadedCameras[index];
-
             // Update video source
             video.src = camera.url;
-
-            // Update telemetry data
-            telemetryData = camera.telemetry;
-            frameTimestamps = camera.frameTimestamps;
-
-            // Update session stats
-            recalculateSessionStats();
 
             // Wait for video to load then restore position
             video.onloadedmetadata = () => {
@@ -1615,68 +1729,28 @@
 
                 // Rebuild history
                 const frame = findFrameAtTime(video.currentTime);
-                rebuildHistoryFromSeek(frame);
+                rebuildHistory(frame);
+                updateDisplay(frame);
             };
 
-            // Update UI
+            updateCameraNavUI();
+        }
+
+        function updateCameraNavUI() {
+            const camera = getCurrentCamera();
             document.getElementById('cameraNavLabel').textContent = camera.label;
             document.querySelectorAll('.camera-dot').forEach((dot, i) => {
-                dot.classList.toggle('active', i === index);
+                dot.classList.toggle('active', i === state.currentCameraIndex);
             });
-
             updateNavButtons();
         }
 
         function updateNavButtons() {
             const prevBtn = document.getElementById('prevCamera');
             const nextBtn = document.getElementById('nextCamera');
-            prevBtn.disabled = currentCameraIndex === 0;
-            nextBtn.disabled = currentCameraIndex === loadedCameras.length - 1;
+            prevBtn.disabled = state.currentCameraIndex === 0;
+            nextBtn.disabled = state.currentCameraIndex === state.cameras.length - 1;
         }
-
-        function recalculateSessionStats() {
-            sessionMinSpeed = Infinity;
-            sessionMaxSpeed = 0;
-            sessionMaxThrottle = 0;
-            sessionMaxGforce = 0;
-
-            for (const frame of telemetryData) {
-                const speedKmh = (frame.vehicleSpeedMps || 0) * 3.6;
-                if (speedKmh < sessionMinSpeed) sessionMinSpeed = speedKmh;
-                if (speedKmh > sessionMaxSpeed) sessionMaxSpeed = speedKmh;
-                const throttle = frame.acceleratorPedalPosition || 0;
-                if (throttle > sessionMaxThrottle) sessionMaxThrottle = throttle;
-                const gX = frame.linearAccelerationMps2X || 0;
-                const gY = frame.linearAccelerationMps2Y || 0;
-                const gTotal = Math.sqrt(gX * gX + gY * gY) / 9.81;
-                if (gTotal > sessionMaxGforce) sessionMaxGforce = gTotal;
-            }
-
-            if (sessionMinSpeed === Infinity) sessionMinSpeed = 0;
-            if (sessionMaxSpeed === 0) sessionMaxSpeed = 60;
-            if (sessionMaxThrottle === 0) sessionMaxThrottle = 50;
-            if (sessionMaxGforce === 0) sessionMaxGforce = 1.0;
-        }
-
-        // Speed history for sparkline (last N seconds worth of data)
-        const SPARKLINE_HISTORY_SECONDS = 8;
-        const SPARKLINE_POINTS = 60; // Number of points to show
-        let speedHistory = [];
-
-        // Session-wide min/max speed for sparkline scaling
-        let sessionMinSpeed = Infinity;
-        let sessionMaxSpeed = 0;
-
-        // Session-wide max throttle for scaling
-        let sessionMaxThrottle = 0;
-
-        // Session-wide max G-force for scaling
-        let sessionMaxGforce = 0;
-
-        // G-Force trail history
-        const GFORCE_TRAIL_LENGTH = 20;
-        let gforceHistory = [];
-        let gforceTrailCtx = null;
 
         // DOM Elements
         const uploadScreen = document.getElementById('uploadScreen');
@@ -1752,27 +1826,31 @@
                 // Initialize protobuf
                 await initProtobuf();
 
-                // Reset loaded cameras
-                loadedCameras = [];
-                currentCameraIndex = 0;
+                // Reset state
+                state.cameras = [];
+                state.currentCameraIndex = 0;
+                state.currentFrame = 0;
+                state.speedHistory = [];
+                state.gforceHistory = [];
+                state._statsCache = null;
 
                 // Process each file
                 for (const file of files) {
                     try {
                         const cameraData = await processSingleVideo(file);
-                        loadedCameras.push(cameraData);
+                        state.cameras.push(cameraData);
                     } catch (e) {
                         console.warn(`Failed to process ${file.name}:`, e.message);
                     }
                 }
 
-                if (loadedCameras.length === 0) {
+                if (state.cameras.length === 0) {
                     throw new Error('No valid telemetry data found in any file');
                 }
 
                 // Sort cameras by label for consistent ordering (Unknown goes to end)
                 const cameraOrder = ['Front', 'Left Repeater', 'Left Pillar', 'Left', 'Back', 'Rear', 'Right', 'Right Pillar', 'Right Repeater'];
-                loadedCameras.sort((a, b) => {
+                state.cameras.sort((a, b) => {
                     // Unknown always goes to the end
                     if (a.label === 'Unknown' && b.label !== 'Unknown') return 1;
                     if (b.label === 'Unknown' && a.label !== 'Unknown') return -1;
@@ -1784,14 +1862,8 @@
                 });
 
                 // Use first camera as primary
-                const primaryCamera = loadedCameras[0];
-                telemetryData = primaryCamera.telemetry;
-                frameTimestamps = primaryCamera.frameTimestamps;
-                videoFile = primaryCamera.url;
-                video.src = videoFile;
-
-                // Calculate session stats
-                recalculateSessionStats();
+                const primaryCamera = getCurrentCamera();
+                video.src = primaryCamera.url;
 
                 // Wait for video metadata
                 await new Promise((resolve, reject) => {
@@ -1851,20 +1923,20 @@
             minimap.initialize();
 
             // Build route from telemetry (use first camera with GPS data)
-            hasGPSData = false;
-            for (const camera of loadedCameras) {
+            let gpsDataFound = false;
+            for (const camera of state.cameras) {
                 const hasGPS = camera.telemetry.some(f =>
                     f.latitudeDeg && f.longitudeDeg &&
                     (f.latitudeDeg !== 0 || f.longitudeDeg !== 0)
                 );
                 if (hasGPS) {
-                    hasGPSData = minimap.buildRoute(camera.telemetry);
+                    gpsDataFound = minimap.buildRoute(camera.telemetry);
                     break;
                 }
             }
 
             // Show/hide minimap section based on GPS data
-            if (hasGPSData) {
+            if (gpsDataFound) {
                 minimapSection.classList.remove('no-gps');
             } else {
                 minimapSection.classList.add('no-gps');
@@ -1872,7 +1944,6 @@
         }
 
         let animationFrameId = null;
-        let lastDisplayedFrame = -1;
 
         function initializeControls() {
             // Set scrubber max to video duration
@@ -1886,9 +1957,9 @@
                 const frame = findFrameAtTime(video.currentTime);
 
                 // Only update DOM if frame changed (performance optimization)
-                if (frame !== lastDisplayedFrame) {
+                if (frame !== state.lastDisplayedFrame) {
                     updateDisplay(frame);
-                    lastDisplayedFrame = frame;
+                    state.lastDisplayedFrame = frame;
                 }
 
                 // Always update scrubber and time for smooth seeking
@@ -1921,12 +1992,12 @@
             video.addEventListener('seeked', () => {
                 const frame = findFrameAtTime(video.currentTime);
                 updateDisplay(frame);
-                lastDisplayedFrame = frame;
+                state.lastDisplayedFrame = frame;
                 scrubber.value = video.currentTime;
                 updateTimeDisplay();
 
                 // Reset history on seek
-                rebuildHistoryFromSeek(frame);
+                rebuildHistory(frame);
             });
 
             // Play ended
@@ -1939,42 +2010,17 @@
             });
         }
 
-        function rebuildHistoryFromSeek(currentFrameIndex) {
-            // Rebuild speed and g-force history from frames before current position
-            speedHistory = [];
-            gforceHistory = [];
-
-            const historyFrames = Math.min(SPARKLINE_POINTS, currentFrameIndex);
-            const startFrame = currentFrameIndex - historyFrames;
-
-            for (let i = startFrame; i <= currentFrameIndex; i++) {
-                if (i >= 0 && i < telemetryData.length) {
-                    const data = telemetryData[i];
-                    const speedKmh = (data.vehicleSpeedMps || 0) * 3.6;
-                    speedHistory.push(speedKmh);
-
-                    const gX = data.linearAccelerationMps2X || 0;
-                    const gY = data.linearAccelerationMps2Y || 0;
-                    gforceHistory.push({ x: gX, y: gY });
-                }
-            }
-
-            // Trim to max lengths
-            while (speedHistory.length > SPARKLINE_POINTS) speedHistory.shift();
-            while (gforceHistory.length > GFORCE_TRAIL_LENGTH) gforceHistory.shift();
-
-            updateSparkline();
-            drawGforceTrail();
-        }
-
         function findFrameAtTime(time) {
+            const timestamps = getFrameTimestamps();
+            const telemetry = getTelemetry();
+
             // Binary search for frame at given time
             let low = 0;
-            let high = frameTimestamps.length - 1;
+            let high = timestamps.length - 1;
 
             while (low < high) {
                 const mid = Math.floor((low + high + 1) / 2);
-                if (frameTimestamps[mid] <= time) {
+                if (timestamps[mid] <= time) {
                     low = mid;
                 } else {
                     high = mid - 1;
@@ -1982,48 +2028,41 @@
             }
 
             // Clamp to telemetry data length
-            return Math.min(low, telemetryData.length - 1);
+            return Math.min(low, telemetry.length - 1);
         }
 
         function updateDisplay(frameIndex) {
-            if (frameIndex < 0 || frameIndex >= telemetryData.length) return;
+            setCurrentFrame(frameIndex);
+            const data = getCurrentFrameData();
+            if (!data) return;
 
-            currentFrame = frameIndex;
-            const data = telemetryData[frameIndex];
+            const stats = getSessionStats();
 
             // Speed (m/s to km/h or mph)
             const speedKmh = (data.vehicleSpeedMps || 0) * 3.6;
-            const displaySpeed = useMetric ? speedKmh : speedKmh * 0.621371;
+            const displaySpeed = state.useMetric ? speedKmh : speedKmh * 0.621371;
             const speedElement = document.getElementById('speedValue');
             speedElement.textContent = displaySpeed.toFixed(1);
 
             // Dynamic speed coloring (green at min, red at max)
-            const speedRange = sessionMaxSpeed - sessionMinSpeed;
-            const speedNormalized = speedRange > 0 ? (speedKmh - sessionMinSpeed) / speedRange : 0;
-            const speedColor = getSpeedColor(speedNormalized);
-            speedElement.style.color = speedColor;
+            const speedRange = stats.maxSpeed - stats.minSpeed;
+            const speedNormalized = speedRange > 0 ? (speedKmh - stats.minSpeed) / speedRange : 0;
+            speedElement.style.color = getSpeedColor(speedNormalized);
 
             // Update speed history
-            speedHistory.push(speedKmh);
-            while (speedHistory.length > SPARKLINE_POINTS) {
-                speedHistory.shift();
-            }
+            addSpeedToHistory(speedKmh);
             updateSparkline();
 
-            // G-Force (rotated 90 degrees clockwise: forward accel now goes up)
+            // G-Force
             const gX = data.linearAccelerationMps2X || 0;
             const gY = data.linearAccelerationMps2Y || 0;
-            const gTotal = Math.sqrt(gX * gX + gY * gY) / 9.81;
 
             // Update G-Force history
-            gforceHistory.push({ x: gX, y: gY });
-            while (gforceHistory.length > GFORCE_TRAIL_LENGTH) {
-                gforceHistory.shift();
-            }
+            addGforceToHistory(gX, gY);
             drawGforceTrail();
 
             // Scale dot position to session max G-force
-            const maxG = sessionMaxGforce > 0 ? sessionMaxGforce : 1.0;
+            const maxG = stats.maxGforce || 1.0;
             const dotX = 50 + (gX / 9.81 / maxG) * 45;
             const dotY = 50 + (gY / 9.81 / maxG) * 45;
 
@@ -2071,7 +2110,7 @@
             document.getElementById('steeringValue').textContent = (data.steeringWheelAngle || 0).toFixed(1);
 
             // Frame info
-            document.getElementById('frameInfo').textContent = `${frameIndex + 1} / ${telemetryData.length}`;
+            document.getElementById('frameInfo').textContent = `${frameIndex + 1} / ${getTelemetry().length}`;
 
             // Location
             const lat = data.latitudeDeg || 0;
@@ -2081,15 +2120,14 @@
             }
 
             // Update GPS minimap
-            if (hasGPSData && minimap) {
+            if (minimap && minimap.hasGPSData()) {
                 minimap.updatePosition(lat, lng, data.headingDeg || 0);
             }
         }
 
         function updateSparkline() {
-            if (speedHistory.length < 2) return;
+            if (state.speedHistory.length < 2) return;
 
-            const svg = document.getElementById('speedSparkline');
             const pathElement = document.getElementById('sparklinePath');
             const areaElement = document.getElementById('sparklineArea');
 
@@ -2098,15 +2136,14 @@
             const padding = 2;
 
             // Use session-wide min/max for scaling
-            const minSpeed = sessionMinSpeed;
-            const maxSpeed = sessionMaxSpeed;
-            const speedRange = maxSpeed - minSpeed;
+            const stats = getSessionStats();
+            const speedRange = stats.maxSpeed - stats.minSpeed;
 
             // Generate path points (scaled between session min and max)
-            const points = speedHistory.map((speed, i) => {
+            const points = state.speedHistory.map((speed, i) => {
                 const x = padding + (i / (SPARKLINE_POINTS - 1)) * (width - padding * 2);
                 // Normalize speed to 0-1 range based on session min/max
-                const normalizedSpeed = speedRange > 0 ? (speed - minSpeed) / speedRange : 0.5;
+                const normalizedSpeed = speedRange > 0 ? (speed - stats.minSpeed) / speedRange : 0.5;
                 const y = height - padding - normalizedSpeed * (height - padding * 2);
                 return { x, y };
             });
@@ -2119,7 +2156,7 @@
             areaElement.setAttribute('d', areaPath);
 
             // Update gradient based on current speed
-            const currentSpeed = speedHistory[speedHistory.length - 1] || 0;
+            const currentSpeed = state.speedHistory[state.speedHistory.length - 1] || 0;
             const gradient = document.getElementById('sparklineGradient');
 
             // Shift gradient colors based on speed
@@ -2147,12 +2184,13 @@
         }
 
         function drawGforceTrail() {
-            if (!gforceTrailCtx || gforceHistory.length < 2) return;
+            if (!gforceTrailCtx || state.gforceHistory.length < 2) return;
 
             const canvas = gforceTrailCtx.canvas;
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
-            const maxG = sessionMaxGforce > 0 ? sessionMaxGforce : 1.0;
+            const stats = getSessionStats();
+            const maxG = stats.maxGforce || 1.0;
             const scale = (canvas.width / 2) * 0.9; // 90% of radius
 
             // Clear canvas
@@ -2161,8 +2199,8 @@
             // Draw trail
             gforceTrailCtx.beginPath();
 
-            for (let i = 0; i < gforceHistory.length; i++) {
-                const point = gforceHistory[i];
+            for (let i = 0; i < state.gforceHistory.length; i++) {
+                const point = state.gforceHistory[i];
                 const x = centerX + (point.x / 9.81 / maxG) * scale;
                 const y = centerY + (point.y / 9.81 / maxG) * scale;
 
@@ -2185,13 +2223,13 @@
             gforceTrailCtx.stroke();
 
             // Draw fading dots along the trail
-            for (let i = 0; i < gforceHistory.length; i++) {
-                const point = gforceHistory[i];
+            for (let i = 0; i < state.gforceHistory.length; i++) {
+                const point = state.gforceHistory[i];
                 const x = centerX + (point.x / 9.81 / maxG) * scale;
                 const y = centerY + (point.y / 9.81 / maxG) * scale;
 
-                const alpha = (i / gforceHistory.length) * 0.5;
-                const radius = 1.5 + (i / gforceHistory.length) * 2.5;
+                const alpha = (i / state.gforceHistory.length) * 0.5;
+                const radius = 1.5 + (i / state.gforceHistory.length) * 2.5;
 
                 gforceTrailCtx.beginPath();
                 gforceTrailCtx.arc(x, y, radius, 0, Math.PI * 2);
@@ -2287,14 +2325,14 @@
                 nextFrameBtn.click();
             } else if (e.code === 'BracketLeft') {
                 // [ key - previous camera
-                switchCamera(currentCameraIndex - 1);
+                switchCamera(state.currentCameraIndex - 1);
             } else if (e.code === 'BracketRight') {
                 // ] key - next camera
-                switchCamera(currentCameraIndex + 1);
+                switchCamera(state.currentCameraIndex + 1);
             } else if (e.key >= '1' && e.key <= '9') {
                 // Number keys 1-9 - switch to camera by index
                 const camIndex = parseInt(e.key) - 1;
-                if (camIndex < loadedCameras.length) {
+                if (camIndex < state.cameras.length) {
                     switchCamera(camIndex);
                 }
             }
@@ -2311,11 +2349,11 @@
 
         // Speed unit toggle
         document.getElementById('speedDisplay').addEventListener('click', () => {
-            useMetric = !useMetric;
-            document.getElementById('speedUnit').textContent = useMetric ? 'KM/H' : 'MPH';
+            state.useMetric = !state.useMetric;
+            document.getElementById('speedUnit').textContent = state.useMetric ? 'KM/H' : 'MPH';
             // Update display with current frame data
-            if (telemetryData.length > 0) {
-                updateDisplay(currentFrame);
+            if (getTelemetry().length > 0) {
+                updateDisplay(state.currentFrame);
             }
         });
 
@@ -2323,7 +2361,10 @@
         document.getElementById('downloadBtn').addEventListener('click', downloadCSV);
 
         function downloadCSV() {
-            if (telemetryData.length === 0) {
+            const telemetry = getTelemetry();
+            const timestamps = getFrameTimestamps();
+
+            if (telemetry.length === 0) {
                 alert('No telemetry data to export');
                 return;
             }
@@ -2352,9 +2393,9 @@
             // Build CSV rows
             const rows = [headers.join(',')];
 
-            for (let i = 0; i < telemetryData.length; i++) {
-                const d = telemetryData[i];
-                const timestamp = frameTimestamps[i] !== undefined ? frameTimestamps[i].toFixed(6) : '';
+            for (let i = 0; i < telemetry.length; i++) {
+                const d = telemetry[i];
+                const timestamp = timestamps[i] !== undefined ? timestamps[i].toFixed(6) : '';
 
                 const row = [
                     d.frameSeqNo || '',
