@@ -137,18 +137,18 @@
         /* HUD Overlay */
         .hud-overlay {
             position: absolute;
-            inset: 0;
             pointer-events: none;
             padding: 20px;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
             z-index: 10;
+            /* Will be positioned dynamically to match video content area */
         }
 
         .hud-top {
             display: flex;
-            justify-content: space-between;
+            justify-content: flex-start;
             align-items: flex-start;
             position: relative;
         }
@@ -301,7 +301,22 @@
             gap: clamp(3px, 1vw, 6px);
         }
 
+        .speed-pedal-row {
+            display: flex;
+            align-items: center;
+            gap: clamp(4px, 1vw, 8px);
+        }
+
+        .speed-pedal-label {
+            font-size: clamp(0.5rem, 1.5vw, 0.65rem);
+            color: rgba(255, 255, 255, 0.6);
+            width: clamp(40px, 10vw, 50px);
+            text-align: right;
+            flex-shrink: 0;
+        }
+
         .speed-pedal-bar {
+            flex: 1;
             height: clamp(6px, 1.5vw, 10px);
             background: rgba(255,255,255,0.15);
             border-radius: 5px;
@@ -746,13 +761,8 @@
             <video id="video" playsinline></video>
 
             <div class="hud-overlay">
-            <!-- Top Row (empty, status moved to drawer) -->
+            <!-- Top Row with Speed Display -->
             <div class="hud-top">
-            </div>
-
-
-            <!-- Bottom Controls -->
-            <div class="hud-bottom">
                 <!-- Speed Display -->
                 <div class="hud-card speedometer-hud">
                     <div class="speed-display">
@@ -760,14 +770,25 @@
                         <span class="speed-unit">KM/H</span>
                     </div>
                     <div class="speed-pedal-bars">
-                        <div class="speed-pedal-bar">
-                            <div class="pedal-bar throttle" id="throttleBar" style="width: 0%"></div>
+                        <div class="speed-pedal-row">
+                            <span class="speed-pedal-label">Throttle</span>
+                            <div class="speed-pedal-bar">
+                                <div class="pedal-bar throttle" id="throttleBar" style="width: 0%"></div>
+                            </div>
                         </div>
-                        <div class="speed-pedal-bar">
-                            <div class="pedal-bar brake" id="brakeBar" style="width: 0%"></div>
+                        <div class="speed-pedal-row">
+                            <span class="speed-pedal-label">Brake</span>
+                            <div class="speed-pedal-bar">
+                                <div class="pedal-bar brake" id="brakeBar" style="width: 0%"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
+            </div>
+
+
+            <!-- Bottom Controls (empty now) -->
+            <div class="hud-bottom">
             </div>
         </div>
         </div>
@@ -1270,6 +1291,10 @@
                 loadingScreen.classList.remove('active');
                 videoContainer.classList.add('active');
 
+                // Position HUD overlay to match video content area
+                updateHudPosition();
+                window.addEventListener('resize', updateHudPosition);
+
                 // Initialize G-Force trail canvas
                 const canvas = document.getElementById('gforceTrailCanvas');
                 gforceTrailCtx = canvas.getContext('2d');
@@ -1299,6 +1324,46 @@
 
         let animationFrameId = null;
         let lastDisplayedFrame = -1;
+
+        // Calculate where the video content actually renders (accounting for object-fit: contain)
+        function updateHudPosition() {
+            const videoEl = document.getElementById('video');
+            const hudOverlay = document.querySelector('.hud-overlay');
+            const wrapper = document.querySelector('.video-wrapper');
+
+            if (!videoEl || !hudOverlay || !wrapper || !videoEl.videoWidth) return;
+
+            const wrapperRect = wrapper.getBoundingClientRect();
+            const containerWidth = wrapperRect.width;
+            const containerHeight = wrapperRect.height;
+
+            const videoWidth = videoEl.videoWidth;
+            const videoHeight = videoEl.videoHeight;
+
+            const containerRatio = containerWidth / containerHeight;
+            const videoRatio = videoWidth / videoHeight;
+
+            let renderedWidth, renderedHeight, offsetX, offsetY;
+
+            if (videoRatio > containerRatio) {
+                // Video is wider - letterbox top/bottom
+                renderedWidth = containerWidth;
+                renderedHeight = containerWidth / videoRatio;
+                offsetX = 0;
+                offsetY = (containerHeight - renderedHeight) / 2;
+            } else {
+                // Video is taller - letterbox left/right
+                renderedHeight = containerHeight;
+                renderedWidth = containerHeight * videoRatio;
+                offsetX = (containerWidth - renderedWidth) / 2;
+                offsetY = 0;
+            }
+
+            hudOverlay.style.left = offsetX + 'px';
+            hudOverlay.style.top = offsetY + 'px';
+            hudOverlay.style.width = renderedWidth + 'px';
+            hudOverlay.style.height = renderedHeight + 'px';
+        }
 
         function initializeControls() {
             // Set scrubber max to video duration
