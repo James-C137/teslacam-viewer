@@ -699,38 +699,72 @@
         .drawer-container {
             max-height: 0;
             overflow: hidden;
-            transition: max-height 0.3s ease, padding 0.3s ease;
+            transition: max-height 0.3s ease;
             background: rgba(0, 0, 0, 0.95);
             border-top: 1px solid #222;
         }
 
         .drawer-container.open {
-            max-height: 300px;
+            max-height: 200px;
+        }
+
+        /* Drawer Tabs */
+        .drawer-tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 0 12px;
             overflow-x: auto;
-            overflow-y: hidden;
+            scrollbar-width: none;
+        }
+
+        .drawer-tabs::-webkit-scrollbar {
+            display: none;
+        }
+
+        .drawer-tab {
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.5);
+            padding: 10px 14px;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-bottom: 2px solid transparent;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .drawer-tab:hover {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .drawer-tab.active {
+            color: #e82127;
+            border-bottom-color: #e82127;
+        }
+
+        .drawer-tab.hidden {
+            display: none;
         }
 
         .drawer-content {
             padding: 16px 20px;
-            display: flex;
-            flex-wrap: nowrap;
-            gap: 20px;
-            align-items: flex-start;
-            min-width: max-content;
+            position: relative;
+            min-height: 100px;
         }
 
-        .drawer-section {
-            display: flex;
+        /* Tab Panels */
+        .tab-panel {
+            display: none;
             flex-direction: column;
             gap: 8px;
-            flex-shrink: 0;
         }
 
-        .drawer-section-title {
-            font-size: 0.65rem;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            color: rgba(255,255,255,0.5);
+        .tab-panel.active {
+            display: flex;
         }
 
         .drawer-status-row {
@@ -777,18 +811,15 @@
 
         /* Drawer G-Force */
         .drawer-gforce {
-            width: 80px;
-            height: 80px;
+            width: 100px;
+            height: 100px;
         }
 
         /* Drawer Sparkline */
-        .drawer-sparkline-section {
-            min-width: 200px;
-            width: 250px;
-        }
-
         .drawer-sparkline-container {
-            height: 50px;
+            height: 60px;
+            width: 100%;
+            max-width: 400px;
         }
 
         .drawer-sparkline-container .speed-sparkline {
@@ -804,8 +835,8 @@
         }
 
         .minimap {
-            width: 100px;
-            height: 100px;
+            width: 120px;
+            height: 120px;
             border-radius: 8px;
             overflow: hidden;
             background: rgba(0, 0, 0, 0.3);
@@ -1057,12 +1088,19 @@
             </div>
         </div>
 
-        <!-- Collapsible Drawer -->
+        <!-- Collapsible Drawer with Tabs -->
         <div class="drawer-container" id="drawerContainer">
+            <div class="drawer-tabs">
+                <button class="drawer-tab active" data-tab="gforce">G-Force</button>
+                <button class="drawer-tab" data-tab="speed">Speed</button>
+                <button class="drawer-tab" data-tab="status">Status</button>
+                <button class="drawer-tab" data-tab="playback">Playback</button>
+                <button class="drawer-tab" data-tab="map" id="mapTab">Map</button>
+                <button class="drawer-tab" data-tab="export">Export</button>
+            </div>
             <div class="drawer-content">
-                <!-- G-Force Section -->
-                <div class="drawer-section">
-                    <div class="drawer-section-title">G-Force</div>
+                <!-- G-Force Tab -->
+                <div class="tab-panel active" data-tab="gforce">
                     <div class="gforce-minimal drawer-gforce">
                         <div class="gforce-ring r1"></div>
                         <div class="gforce-ring r2"></div>
@@ -1072,9 +1110,8 @@
                     </div>
                 </div>
 
-                <!-- Speed History Section -->
-                <div class="drawer-section drawer-sparkline-section">
-                    <div class="drawer-section-title">Speed History</div>
+                <!-- Speed History Tab -->
+                <div class="tab-panel" data-tab="speed">
                     <div class="drawer-sparkline-container">
                         <svg class="speed-sparkline" id="speedSparkline" viewBox="0 0 200 40" preserveAspectRatio="none">
                             <defs>
@@ -1094,9 +1131,8 @@
                     </div>
                 </div>
 
-                <!-- Status Section -->
-                <div class="drawer-section">
-                    <div class="drawer-section-title">Status</div>
+                <!-- Status Tab -->
+                <div class="tab-panel" data-tab="status">
                     <div class="drawer-status-row">
                         <span class="drawer-status-label">Gear</span>
                         <span class="drawer-status-value" id="gearStatus">D</span>
@@ -1107,18 +1143,16 @@
                     </div>
                 </div>
 
-                <!-- Frame Info Section -->
-                <div class="drawer-section">
-                    <div class="drawer-section-title">Playback</div>
+                <!-- Playback Tab -->
+                <div class="tab-panel" data-tab="playback">
                     <div class="drawer-info-item">
                         <span class="drawer-info-label">Frame</span>
                         <span class="drawer-info-value" id="frameInfo">0 / 0</span>
                     </div>
                 </div>
 
-                <!-- GPS Minimap Section -->
-                <div class="drawer-section" id="minimapSection">
-                    <div class="drawer-section-title">Map</div>
+                <!-- Map Tab -->
+                <div class="tab-panel" data-tab="map" id="minimapSection">
                     <div class="minimap-container" id="minimapContainer">
                         <div class="minimap" id="minimap"></div>
                     </div>
@@ -1128,9 +1162,8 @@
                     </div>
                 </div>
 
-                <!-- Download Section -->
-                <div class="drawer-section">
-                    <div class="drawer-section-title">Export</div>
+                <!-- Export Tab -->
+                <div class="tab-panel" data-tab="export">
                     <button class="download-btn" id="downloadBtn">Download CSV</button>
                 </div>
             </div>
@@ -1935,11 +1968,14 @@
                 }
             }
 
-            // Show/hide minimap section based on GPS data
+            // Show/hide map tab based on GPS data
+            const mapTab = document.getElementById('mapTab');
             if (gpsDataFound) {
                 minimapSection.classList.remove('no-gps');
+                mapTab.classList.remove('hidden');
             } else {
                 minimapSection.classList.add('no-gps');
+                mapTab.classList.add('hidden');
             }
         }
 
@@ -2345,6 +2381,48 @@
         drawerToggle.addEventListener('click', () => {
             drawerToggle.classList.toggle('open');
             drawerContainer.classList.toggle('open');
+        });
+
+        // Tab switching
+        const drawerTabs = document.querySelectorAll('.drawer-tab');
+        const tabPanels = document.querySelectorAll('.tab-panel');
+
+        function switchTab(tabName) {
+            // Update tab buttons
+            drawerTabs.forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.tab === tabName);
+            });
+
+            // Update tab panels
+            tabPanels.forEach(panel => {
+                panel.classList.toggle('active', panel.dataset.tab === tabName);
+            });
+
+            // Handle Leaflet map resize when Map tab becomes visible
+            if (tabName === 'map' && minimap && minimap.map) {
+                setTimeout(() => {
+                    minimap.map.invalidateSize();
+                    if (minimap.routeBounds) {
+                        minimap.map.fitBounds(minimap.routeBounds, { padding: [15, 15] });
+                    }
+                }, 50);
+            }
+
+            // Handle G-Force canvas resize
+            if (tabName === 'gforce') {
+                const canvas = document.getElementById('gforceTrailCanvas');
+                if (canvas && gforceTrailCtx) {
+                    const container = canvas.parentElement;
+                    const size = container.offsetHeight || container.offsetWidth || 80;
+                    canvas.width = size;
+                    canvas.height = size;
+                    drawGforceTrail();
+                }
+            }
+        }
+
+        drawerTabs.forEach(tab => {
+            tab.addEventListener('click', () => switchTab(tab.dataset.tab));
         });
 
         // Speed unit toggle
