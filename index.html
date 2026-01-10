@@ -2099,8 +2099,8 @@
 
             // Scale dot position to session max G-force
             const maxG = stats.maxGforce || 1.0;
-            const dotX = 50 + (gX / 9.81 / maxG) * 45;
-            const dotY = 50 + (gY / 9.81 / maxG) * 45;
+            const dotX = 50 - (gX / 9.81 / maxG) * 45;
+            const dotY = 50 - (gY / 9.81 / maxG) * 45;
 
             const gforceDot = document.getElementById('gforceDot');
             gforceDot.style.left = `${Math.max(5, Math.min(95, dotX))}%`;
@@ -2237,8 +2237,8 @@
 
             for (let i = 0; i < state.gforceHistory.length; i++) {
                 const point = state.gforceHistory[i];
-                const x = centerX + (point.x / 9.81 / maxG) * scale;
-                const y = centerY + (point.y / 9.81 / maxG) * scale;
+                const x = centerX - (point.x / 9.81 / maxG) * scale;
+                const y = centerY - (point.y / 9.81 / maxG) * scale;
 
                 if (i === 0) {
                     gforceTrailCtx.moveTo(x, y);
@@ -2261,8 +2261,8 @@
             // Draw fading dots along the trail
             for (let i = 0; i < state.gforceHistory.length; i++) {
                 const point = state.gforceHistory[i];
-                const x = centerX + (point.x / 9.81 / maxG) * scale;
-                const y = centerY + (point.y / 9.81 / maxG) * scale;
+                const x = centerX - (point.x / 9.81 / maxG) * scale;
+                const y = centerY - (point.y / 9.81 / maxG) * scale;
 
                 const alpha = (i / state.gforceHistory.length) * 0.5;
                 const radius = 1.5 + (i / state.gforceHistory.length) * 2.5;
