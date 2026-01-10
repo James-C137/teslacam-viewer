@@ -705,7 +705,7 @@
         }
 
         .drawer-container.open {
-            max-height: 200px;
+            max-height: 280px;
         }
 
         /* Drawer Tabs */
@@ -753,7 +753,8 @@
         .drawer-content {
             padding: 16px 20px;
             position: relative;
-            min-height: 100px;
+            max-height: 240px;
+            overflow-y: auto;
         }
 
         /* Tab Panels */
@@ -811,8 +812,100 @@
 
         /* Drawer G-Force */
         .drawer-gforce {
-            width: 100px;
-            height: 100px;
+            width: 160px;
+            height: 160px;
+        }
+
+        /* G-Force Labels */
+        .gforce-labels-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .gforce-axis-label {
+            font-size: 0.6rem;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .gforce-axis-label.vertical {
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            transform: rotate(180deg);
+        }
+
+        .gforce-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .gforce-ring-label {
+            position: absolute;
+            font-size: 0.5rem;
+            color: rgba(255, 255, 255, 0.4);
+            pointer-events: none;
+        }
+
+        .gforce-ring-label.r1-label {
+            top: 50%;
+            right: calc(50% - 16.5% - 2px);
+            transform: translateY(-50%);
+        }
+
+        .gforce-ring-label.r2-label {
+            top: 50%;
+            right: calc(50% - 33% - 2px);
+            transform: translateY(-50%);
+        }
+
+        .gforce-ring-label.r3-label {
+            top: 50%;
+            right: calc(50% - 50% - 2px);
+            transform: translateY(-50%);
+        }
+
+        .gforce-unit-label {
+            font-size: 0.55rem;
+            color: rgba(255, 255, 255, 0.4);
+            text-align: center;
+            margin-top: 8px;
+        }
+
+        .gforce-panel-layout {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .gforce-raw-values {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .gforce-raw-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .gforce-raw-label {
+            font-size: 0.7rem;
+            color: rgba(255, 255, 255, 0.5);
+            min-width: 50px;
+        }
+
+        .gforce-raw-value {
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 0.85rem;
+            color: rgba(255,255,255,0.6);
+            min-width: 60px;
+            text-align: right;
         }
 
         /* Drawer Sparkline */
@@ -1101,12 +1194,39 @@
             <div class="drawer-content">
                 <!-- G-Force Tab -->
                 <div class="tab-panel active" data-tab="gforce">
-                    <div class="gforce-minimal drawer-gforce">
-                        <div class="gforce-ring r1"></div>
-                        <div class="gforce-ring r2"></div>
-                        <div class="gforce-ring r3"></div>
-                        <canvas class="gforce-trail-canvas" id="gforceTrailCanvas"></canvas>
-                        <div class="gforce-dot" id="gforceDot"></div>
+                    <div class="gforce-panel-layout">
+                        <div class="gforce-labels-container">
+                            <span class="gforce-axis-label vertical">Left</span>
+                            <div class="gforce-wrapper">
+                                <span class="gforce-axis-label">Front</span>
+                                <div class="gforce-minimal drawer-gforce">
+                                    <div class="gforce-ring r1"></div>
+                                    <div class="gforce-ring r2"></div>
+                                    <div class="gforce-ring r3"></div>
+                                    <span class="gforce-ring-label r1-label" id="gforceLabel1"></span>
+                                    <span class="gforce-ring-label r2-label" id="gforceLabel2"></span>
+                                    <span class="gforce-ring-label r3-label" id="gforceLabel3"></span>
+                                    <canvas class="gforce-trail-canvas" id="gforceTrailCanvas"></canvas>
+                                    <div class="gforce-dot" id="gforceDot"></div>
+                                </div>
+                                <span class="gforce-axis-label">Back</span>
+                            </div>
+                            <span class="gforce-axis-label vertical">Right</span>
+                        </div>
+                        <div class="gforce-raw-values">
+                            <div class="gforce-raw-item">
+                                <span class="gforce-raw-label">X (Lat)</span>
+                                <span class="gforce-raw-value" id="gforceRawX">0.00g</span>
+                            </div>
+                            <div class="gforce-raw-item">
+                                <span class="gforce-raw-label">Y (Lon)</span>
+                                <span class="gforce-raw-value" id="gforceRawY">0.00g</span>
+                            </div>
+                            <div class="gforce-raw-item">
+                                <span class="gforce-raw-label">Z (Vert)</span>
+                                <span class="gforce-raw-value" id="gforceRawZ">0.00g</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -1764,6 +1884,7 @@
                 const frame = findFrameAtTime(video.currentTime);
                 rebuildHistory(frame);
                 updateDisplay(frame);
+                updateGforceLabels();
             };
 
             updateCameraNavUI();
@@ -1937,6 +2058,7 @@
                 // Setup controls
                 initializeControls();
                 updateDisplay(0);
+                updateGforceLabels();
                 video.playbackRate = 1;
 
             } catch (error) {
@@ -2092,6 +2214,12 @@
             // G-Force
             const gX = data.linearAccelerationMps2X || 0;
             const gY = data.linearAccelerationMps2Y || 0;
+            const gZ = data.linearAccelerationMps2Z || 0;
+
+            // Update raw g-force values display
+            document.getElementById('gforceRawX').textContent = (gX / 9.81).toFixed(4) + 'g';
+            document.getElementById('gforceRawY').textContent = (gY / 9.81).toFixed(4) + 'g';
+            document.getElementById('gforceRawZ').textContent = (gZ / 9.81).toFixed(4) + 'g';
 
             // Update G-Force history
             addGforceToHistory(gX, gY);
@@ -2099,7 +2227,7 @@
 
             // Scale dot position to session max G-force
             const maxG = stats.maxGforce || 1.0;
-            const dotX = 50 - (gX / 9.81 / maxG) * 45;
+            const dotX = 50 + (gX / 9.81 / maxG) * 45;
             const dotY = 50 - (gY / 9.81 / maxG) * 45;
 
             const gforceDot = document.getElementById('gforceDot');
@@ -2219,6 +2347,20 @@
             }
         }
 
+        function updateGforceLabels() {
+            const stats = getSessionStats();
+            const maxG = stats.maxGforce || 1.0;
+
+            // Labels at 33%, 66%, and 100% of maxG
+            const label1 = (maxG / 3).toFixed(1);
+            const label2 = ((maxG * 2) / 3).toFixed(1);
+            const label3 = maxG.toFixed(1);
+
+            document.getElementById('gforceLabel1').textContent = label1 + 'g';
+            document.getElementById('gforceLabel2').textContent = label2 + 'g';
+            document.getElementById('gforceLabel3').textContent = label3 + 'g';
+        }
+
         function drawGforceTrail() {
             if (!gforceTrailCtx || state.gforceHistory.length < 2) return;
 
@@ -2237,7 +2379,7 @@
 
             for (let i = 0; i < state.gforceHistory.length; i++) {
                 const point = state.gforceHistory[i];
-                const x = centerX - (point.x / 9.81 / maxG) * scale;
+                const x = centerX + (point.x / 9.81 / maxG) * scale;
                 const y = centerY - (point.y / 9.81 / maxG) * scale;
 
                 if (i === 0) {
@@ -2261,7 +2403,7 @@
             // Draw fading dots along the trail
             for (let i = 0; i < state.gforceHistory.length; i++) {
                 const point = state.gforceHistory[i];
-                const x = centerX - (point.x / 9.81 / maxG) * scale;
+                const x = centerX + (point.x / 9.81 / maxG) * scale;
                 const y = centerY - (point.y / 9.81 / maxG) * scale;
 
                 const alpha = (i / state.gforceHistory.length) * 0.5;
