@@ -5,10 +5,73 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tesla Telemetry - Video Player</title>
     <script src="https://cdn.jsdelivr.net/npm/protobufjs@7.2.6/dist/protobuf.min.js"></script>
+    <!-- Alpine.js for reactive UI -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <!-- Leaflet for GPS minimap -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
+        :root {
+            /* Brand colors */
+            --tesla-red: #e82127;
+            --tesla-red-light: #ff6b6b;
+            --tesla-red-alt: #ff4444;
+            --tesla-red-glow: rgba(232, 33, 39, 0.6);
+            --tesla-red-bg: rgba(232, 33, 39, 0.1);
+            --tesla-red-bg-subtle: rgba(232, 33, 39, 0.05);
+
+            /* Status colors */
+            --green: #22c55e;
+            --green-light: #4ade80;
+            --green-glow: rgba(34, 197, 94, 0.6);
+            --yellow: #fbbf24;
+            --orange: #f97316;
+            --red-warning: #ef4444;
+
+            /* Backgrounds */
+            --bg-dark: #000;
+            --bg-card: rgba(0, 0, 0, 0.7);
+            --bg-card-solid: rgba(0, 0, 0, 0.9);
+            --bg-card-deep: rgba(0, 0, 0, 0.95);
+            --bg-overlay: rgba(0, 0, 0, 0.4);
+            --bg-white-subtle: rgba(255, 255, 255, 0.02);
+            --bg-white-dim: rgba(255, 255, 255, 0.1);
+            --bg-white-light: rgba(255, 255, 255, 0.15);
+            --bg-white-medium: rgba(255, 255, 255, 0.2);
+            --bg-white-bright: rgba(255, 255, 255, 0.25);
+
+            /* Borders */
+            --border-dark: #222;
+            --border-dim: #333;
+            --border-muted: #555;
+            --border-white-subtle: rgba(255, 255, 255, 0.05);
+            --border-white-dim: rgba(255, 255, 255, 0.1);
+            --border-white-light: rgba(255, 255, 255, 0.15);
+            --border-white-medium: rgba(255, 255, 255, 0.2);
+            --border-white-bright: rgba(255, 255, 255, 0.3);
+            --border-white-strong: rgba(255, 255, 255, 0.4);
+
+            /* Text colors */
+            --text-muted: rgba(255, 255, 255, 0.4);
+            --text-dim: rgba(255, 255, 255, 0.5);
+            --text-secondary: rgba(255, 255, 255, 0.6);
+            --text-tertiary: rgba(255, 255, 255, 0.7);
+            --text-primary: rgba(255, 255, 255, 0.8);
+            --text-gray: #666;
+            --text-gray-light: #aaa;
+
+            /* Transitions */
+            --transition-fast: all 0.2s ease;
+            --transition-normal: all 0.3s ease;
+
+            /* Effects */
+            --blur-standard: blur(12px);
+            --blur-light: blur(4px);
+            --shadow-text: 0 1px 3px rgba(0, 0, 0, 0.8);
+            --shadow-button: 0 2px 8px rgba(0, 0, 0, 0.3);
+            --shadow-dot: 0 1px 3px rgba(0, 0, 0, 0.5);
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -17,7 +80,7 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #000;
+            background: var(--bg-dark);
             color: #fff;
             min-height: 100vh;
             display: flex;
@@ -36,7 +99,7 @@
             font-size: 2.5rem;
             font-weight: 300;
             letter-spacing: 4px;
-            background: linear-gradient(90deg, #e82127, #ff6b6b);
+            background: linear-gradient(90deg, var(--tesla-red), var(--tesla-red-light));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -44,27 +107,27 @@
         }
 
         .upload-screen p {
-            color: #666;
+            color: var(--text-gray);
             margin-bottom: 40px;
         }
 
         .upload-box {
-            border: 2px dashed #333;
+            border: 2px dashed var(--border-dim);
             border-radius: 16px;
             padding: 60px clamp(24px, 8vw, 120px);
             cursor: pointer;
-            transition: all 0.3s ease;
-            background: rgba(255,255,255,0.02);
+            transition: var(--transition-normal);
+            background: var(--bg-white-subtle);
         }
 
         .upload-box:hover {
-            border-color: #e82127;
-            background: rgba(232, 33, 39, 0.05);
+            border-color: var(--tesla-red);
+            background: var(--tesla-red-bg-subtle);
         }
 
         .upload-box.dragover {
-            border-color: #e82127;
-            background: rgba(232, 33, 39, 0.1);
+            border-color: var(--tesla-red);
+            background: var(--tesla-red-bg);
             transform: scale(1.02);
         }
 
@@ -80,7 +143,7 @@
         }
 
         .upload-box span {
-            color: #666;
+            color: var(--text-gray);
             font-size: 0.85rem;
         }
 
@@ -100,8 +163,8 @@
         .spinner {
             width: 48px;
             height: 48px;
-            border: 3px solid #333;
-            border-top-color: #e82127;
+            border: 3px solid var(--border-dim);
+            border-top-color: var(--tesla-red);
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin: 0 auto 20px;
@@ -116,7 +179,7 @@
             display: none;
             position: fixed;
             inset: 0;
-            background: #000;
+            background: var(--bg-dark);
             overflow: hidden;
             flex-direction: column;
         }
@@ -170,8 +233,8 @@
             font-weight: 500;
             text-transform: uppercase;
             letter-spacing: 1.5px;
-            color: rgba(255,255,255,0.7);
-            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+            color: var(--text-tertiary);
+            text-shadow: var(--shadow-text);
         }
 
 
@@ -184,9 +247,9 @@
 
         /* HUD Card */
         .hud-card {
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255,255,255,0.1);
+            background: var(--bg-card);
+            backdrop-filter: var(--blur-standard);
+            border: 1px solid var(--border-white-dim);
             border-radius: 12px;
             padding: 16px 20px;
         }
@@ -195,7 +258,7 @@
             font-size: 0.65rem;
             text-transform: uppercase;
             letter-spacing: 2px;
-            color: rgba(255,255,255,0.5);
+            color: var(--text-dim);
             margin-bottom: 8px;
         }
 
@@ -214,7 +277,7 @@
 
         .gforce-minimal .gforce-ring {
             position: absolute;
-            border: 1px solid rgba(255,255,255,0.2);
+            border: 1px solid var(--border-white-medium);
             border-radius: 50%;
             top: 50%;
             left: 50%;
@@ -247,7 +310,7 @@
             position: absolute;
             width: 14px;
             height: 14px;
-            background: radial-gradient(circle, #ff6666 0%, #e82127 100%);
+            background: radial-gradient(circle, var(--tesla-red-light) 0%, var(--tesla-red) 100%);
             border-radius: 50%;
             top: 50%;
             left: 50%;
@@ -288,11 +351,10 @@
             transition: color 0.3s ease;
         }
 
-
         .speed-unit {
             font-size: clamp(0.55rem, 1.5vw, 1rem);
             font-weight: 500;
-            color: rgba(255,255,255,0.8);
+            color: var(--text-primary);
         }
 
         /* Autopilot Status (below speed) */
@@ -302,7 +364,7 @@
             gap: 6px;
             margin-top: clamp(6px, 1.5vw, 12px);
             font-size: clamp(0.6rem, 1.8vw, 0.9rem);
-            color: rgba(255,255,255,0.6);
+            color: var(--text-secondary);
         }
 
         .autopilot-hud .status-indicator {
@@ -360,26 +422,26 @@
             display: flex;
             flex-direction: column;
             justify-content: flex-end;
-            background: rgba(255, 255, 255, 0.1);
+            background: var(--bg-white-dim);
         }
 
         .pedal-bar-vertical-bottom {
             flex: 1;
             position: relative;
-            background: rgba(255, 255, 255, 0.1);
+            background: var(--bg-white-dim);
         }
 
         .pedal-bar-vertical-throttle {
             width: 100%;
-            background: linear-gradient(to top, #22c55e, #4ade80);
-            box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+            background: linear-gradient(to top, var(--green), var(--green-light));
+            box-shadow: 0 0 8px var(--green-glow);
             transition: height 0.05s ease-out;
         }
 
         .pedal-bar-vertical-brake {
             width: 100%;
-            background: linear-gradient(to bottom, #e82127, #ff6b6b);
-            box-shadow: 0 0 8px rgba(232, 33, 39, 0.6);
+            background: linear-gradient(to bottom, var(--tesla-red), var(--tesla-red-light));
+            box-shadow: 0 0 8px var(--tesla-red-glow);
             transition: height 0.05s ease-out;
         }
 
@@ -389,7 +451,7 @@
             top: 50%;
             width: 100%;
             height: 2px;
-            background: rgba(255, 255, 255, 0.3);
+            background: var(--border-white-bright);
             transform: translateY(-50%);
             z-index: 21;
         }
@@ -413,13 +475,13 @@
         .pedal-label {
             font-size: 0.75rem;
             width: 60px;
-            color: rgba(255,255,255,0.7);
+            color: var(--text-tertiary);
         }
 
         .pedal-bar-bg {
             flex: 1;
             height: 8px;
-            background: rgba(255,255,255,0.1);
+            background: var(--bg-white-dim);
             border-radius: 4px;
             overflow: hidden;
         }
@@ -431,13 +493,13 @@
         }
 
         .pedal-bar.throttle {
-            background: linear-gradient(90deg, #22c55e, #4ade80);
-            box-shadow: 0 0 12px rgba(34, 197, 94, 0.5);
+            background: linear-gradient(90deg, var(--green), var(--green-light));
+            box-shadow: 0 0 12px var(--green-glow);
         }
 
         .pedal-bar.brake {
-            background: linear-gradient(90deg, #e82127, #ff6b6b);
-            box-shadow: 0 0 12px rgba(232, 33, 39, 0.5);
+            background: linear-gradient(90deg, var(--tesla-red), var(--tesla-red-light));
+            box-shadow: 0 0 12px var(--tesla-red-glow);
         }
 
         .pedal-value {
@@ -458,7 +520,7 @@
             align-items: center;
             gap: 12px;
             padding: 6px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
+            border-bottom: 1px solid var(--border-white-subtle);
         }
 
         .status-row:last-child {
@@ -467,7 +529,7 @@
 
         .status-label {
             font-size: 0.75rem;
-            color: rgba(255,255,255,0.5);
+            color: var(--text-dim);
         }
 
         .status-value {
@@ -484,20 +546,20 @@
         }
 
         .status-indicator.active {
-            background: #4ade80;
-            box-shadow: 0 0 8px rgba(74, 222, 128, 0.6);
+            background: var(--green-light);
+            box-shadow: 0 0 8px var(--green-glow);
         }
 
         .status-indicator.inactive {
-            background: #555;
+            background: var(--border-muted);
         }
 
         /* Controls Bar */
         .controls-bar {
-            background: rgba(0, 0, 0, 0.9);
-            backdrop-filter: blur(12px);
+            background: var(--bg-card-solid);
+            backdrop-filter: var(--blur-standard);
             padding: 12px 20px;
-            border-top: 1px solid #222;
+            border-top: 1px solid var(--border-dark);
         }
 
         .scrubber-row {
@@ -516,15 +578,15 @@
             height: 44px;
             border-radius: 50%;
             border: none;
-            background: linear-gradient(135deg, #e82127, #ff4444);
+            background: linear-gradient(135deg, var(--tesla-red), var(--tesla-red-alt));
             color: white;
             font-size: 16px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.2s ease;
-            box-shadow: 0 4px 16px rgba(232, 33, 39, 0.4);
+            transition: var(--transition-fast);
+            box-shadow: 0 4px 16px var(--tesla-red-glow);
             flex-shrink: 0;
         }
 
@@ -543,18 +605,18 @@
             height: 32px;
             border-radius: 50%;
             border: none;
-            background: rgba(255, 255, 255, 0.15);
+            background: var(--bg-white-light);
             color: white;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.2s ease;
+            transition: var(--transition-fast);
             flex-shrink: 0;
         }
 
         .frame-btn:hover {
-            background: rgba(255, 255, 255, 0.25);
+            background: var(--bg-white-bright);
             transform: scale(1.05);
         }
 
@@ -572,7 +634,7 @@
         .time-display {
             font-family: 'SF Mono', Monaco, monospace;
             font-size: 0.85rem;
-            color: rgba(255,255,255,0.6);
+            color: var(--text-secondary);
             flex-shrink: 0;
         }
 
@@ -581,7 +643,7 @@
             height: 6px;
             -webkit-appearance: none;
             appearance: none;
-            background: rgba(255,255,255,0.2);
+            background: var(--bg-white-medium);
             border-radius: 2px;
             cursor: pointer;
         }
@@ -593,24 +655,23 @@
             border-radius: 50%;
             background: #fff;
             cursor: pointer;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            box-shadow: var(--shadow-button);
         }
 
-
         .download-btn {
-            background: rgba(255,255,255,0.1);
-            border: 1px solid rgba(255,255,255,0.2);
+            background: var(--bg-white-dim);
+            border: 1px solid var(--border-white-medium);
             color: #fff;
             padding: 6px 12px;
             border-radius: 6px;
             font-size: 0.8rem;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: var(--transition-fast);
         }
 
         .download-btn:hover {
-            background: rgba(255,255,255,0.2);
-            border-color: rgba(255,255,255,0.4);
+            background: var(--bg-white-medium);
+            border-color: var(--border-white-strong);
         }
 
         .info-row {
@@ -618,7 +679,7 @@
             justify-content: space-between;
             margin-top: 12px;
             font-size: 0.7rem;
-            color: rgba(255,255,255,0.4);
+            color: var(--text-muted);
         }
 
         /* Recording indicator */
@@ -626,13 +687,13 @@
             display: flex;
             align-items: center;
             gap: 6px;
-            color: #e82127;
+            color: var(--tesla-red);
         }
 
         .rec-dot {
             width: 6px;
             height: 6px;
-            background: #e82127;
+            background: var(--tesla-red);
             border-radius: 50%;
             animation: pulse 1.5s infinite;
         }
@@ -646,7 +707,7 @@
         .error-message {
             display: none;
             background: rgba(232, 33, 39, 0.2);
-            border: 1px solid #e82127;
+            border: 1px solid var(--tesla-red);
             border-radius: 8px;
             padding: 16px 20px;
             margin-top: 20px;
@@ -658,20 +719,20 @@
         }
 
         .error-message h4 {
-            color: #e82127;
+            color: var(--tesla-red);
             margin-bottom: 8px;
         }
 
         .error-message p {
             font-size: 0.85rem;
-            color: #aaa;
+            color: var(--text-gray-light);
         }
 
         /* Collapsible Drawer */
         .drawer-toggle {
             background: none;
             border: none;
-            color: rgba(255,255,255,0.6);
+            color: var(--text-secondary);
             cursor: pointer;
             padding: 4px 8px;
             font-size: 0.75rem;
@@ -700,8 +761,8 @@
             max-height: 0;
             overflow: hidden;
             transition: max-height 0.3s ease;
-            background: rgba(0, 0, 0, 0.95);
-            border-top: 1px solid #222;
+            background: var(--bg-card-deep);
+            border-top: 1px solid var(--border-dark);
         }
 
         .drawer-container.open {
@@ -712,7 +773,7 @@
         .drawer-tabs {
             display: flex;
             gap: 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            border-bottom: 1px solid var(--border-white-dim);
             padding: 0 12px;
             overflow-x: auto;
             scrollbar-width: none;
@@ -725,25 +786,25 @@
         .drawer-tab {
             background: none;
             border: none;
-            color: rgba(255, 255, 255, 0.5);
+            color: var(--text-dim);
             padding: 10px 14px;
             font-size: 0.7rem;
             text-transform: uppercase;
             letter-spacing: 1px;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: var(--transition-fast);
             border-bottom: 2px solid transparent;
             white-space: nowrap;
             flex-shrink: 0;
         }
 
         .drawer-tab:hover {
-            color: rgba(255, 255, 255, 0.8);
+            color: var(--text-primary);
         }
 
         .drawer-tab.active {
-            color: #e82127;
-            border-bottom-color: #e82127;
+            color: var(--tesla-red);
+            border-bottom-color: var(--tesla-red);
         }
 
         .drawer-tab.hidden {
@@ -777,7 +838,7 @@
         }
 
         .drawer-status-label {
-            color: rgba(255,255,255,0.5);
+            color: var(--text-dim);
         }
 
         .drawer-status-value {
@@ -789,7 +850,7 @@
             flex-wrap: wrap;
             gap: 20px;
             font-size: 0.75rem;
-            color: rgba(255,255,255,0.6);
+            color: var(--text-secondary);
         }
 
         .drawer-info-item {
@@ -802,12 +863,12 @@
             font-size: 0.65rem;
             text-transform: uppercase;
             letter-spacing: 1px;
-            color: rgba(255,255,255,0.4);
+            color: var(--text-muted);
         }
 
         .drawer-info-value {
             font-family: 'SF Mono', Monaco, monospace;
-            color: rgba(255,255,255,0.8);
+            color: var(--text-primary);
         }
 
         /* Drawer G-Force */
@@ -825,7 +886,7 @@
 
         .gforce-axis-label {
             font-size: 0.6rem;
-            color: rgba(255, 255, 255, 0.5);
+            color: var(--text-dim);
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
@@ -846,7 +907,7 @@
         .gforce-ring-label {
             position: absolute;
             font-size: 0.5rem;
-            color: rgba(255, 255, 255, 0.4);
+            color: var(--text-muted);
             pointer-events: none;
         }
 
@@ -870,7 +931,7 @@
 
         .gforce-unit-label {
             font-size: 0.55rem;
-            color: rgba(255, 255, 255, 0.4);
+            color: var(--text-muted);
             text-align: center;
             margin-top: 8px;
         }
@@ -896,14 +957,14 @@
 
         .gforce-raw-label {
             font-size: 0.7rem;
-            color: rgba(255, 255, 255, 0.5);
+            color: var(--text-dim);
             min-width: 50px;
         }
 
         .gforce-raw-value {
             font-family: 'SF Mono', Monaco, monospace;
             font-size: 0.85rem;
-            color: rgba(255,255,255,0.6);
+            color: var(--text-secondary);
             min-width: 60px;
             text-align: right;
         }
@@ -932,8 +993,8 @@
             height: 120px;
             border-radius: 8px;
             overflow: hidden;
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: var(--bg-overlay);
+            border: 1px solid var(--border-white-medium);
         }
 
         /* Semi-transparent map tiles */
@@ -959,10 +1020,10 @@
         .vehicle-dot {
             width: 12px;
             height: 12px;
-            background: #e82127;
+            background: var(--tesla-red);
             border: 2px solid white;
             border-radius: 50%;
-            box-shadow: 0 0 8px rgba(232, 33, 39, 0.6);
+            box-shadow: 0 0 8px var(--tesla-red-glow);
         }
 
         /* Hide minimap section when no GPS data */
@@ -984,8 +1045,8 @@
             font-size: 0.65rem;
             text-transform: uppercase;
             letter-spacing: 1.5px;
-            color: rgba(255, 255, 255, 0.6);
-            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+            color: var(--text-secondary);
+            text-shadow: var(--shadow-text);
         }
 
         .camera-nav-bottom {
@@ -1010,12 +1071,12 @@
             width: 28px;
             height: 28px;
             border-radius: 50%;
-            background: rgba(0, 0, 0, 0.4);
-            backdrop-filter: blur(4px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: var(--bg-overlay);
+            backdrop-filter: var(--blur-light);
+            border: 1px solid var(--border-white-light);
             color: white;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: var(--transition-fast);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -1029,7 +1090,7 @@
 
         .nav-arrow:hover {
             background: rgba(0, 0, 0, 0.6);
-            border-color: rgba(255, 255, 255, 0.3);
+            border-color: var(--border-white-bright);
         }
 
         .nav-arrow:active {
@@ -1050,21 +1111,21 @@
             width: 8px;
             height: 8px;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.4);
+            background: var(--border-white-strong);
             cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+            transition: var(--transition-fast);
+            box-shadow: var(--shadow-dot);
             -webkit-tap-highlight-color: transparent;
         }
 
         .camera-dot.active {
-            background: #e82127;
+            background: var(--tesla-red);
             transform: scale(1.25);
-            box-shadow: 0 0 6px rgba(232, 33, 39, 0.6);
+            box-shadow: 0 0 6px var(--tesla-red-glow);
         }
 
         .camera-dot:hover:not(.active) {
-            background: rgba(255, 255, 255, 0.6);
+            background: var(--text-secondary);
         }
 
         /* Hide camera navigation when only one camera */
@@ -1073,83 +1134,85 @@
         }
     </style>
 </head>
-<body>
+<body x-data="telemetryApp()" @keydown.window="handleKeydown($event)">
     <!-- Upload Screen -->
-    <div class="upload-screen" id="uploadScreen">
+    <div class="upload-screen" x-show="screen === 'upload'" x-cloak>
         <h1>TESLA TELEMETRY</h1>
         <p>Video Player with HUD Overlay</p>
-        <div class="upload-box" id="uploadBox">
+        <div class="upload-box"
+             @click="$refs.fileInput.click()"
+             @dragover.prevent="isDragging = true"
+             @dragleave="isDragging = false"
+             @drop.prevent="handleDrop($event)"
+             :class="{ dragover: isDragging }">
             <div class="upload-icon">🎬</div>
             <h3>Drop your Tesla dashcam MP4s here</h3>
             <span>Select multiple cameras (front, back, left, right) for multi-view</span>
-            <input type="file" id="fileInput" accept="video/mp4,video/*" multiple>
+            <input type="file" x-ref="fileInput" @change="handleFileSelect($event)" accept="video/mp4,video/*" multiple style="display:none">
         </div>
-        <div class="error-message" id="errorMessage">
+        <div class="error-message" :class="{ active: showError }">
             <h4>No telemetry found</h4>
             <p>This video doesn't contain SEI metadata. Make sure it was recorded on firmware 2025.44.25 or later with HW3+.</p>
         </div>
     </div>
 
     <!-- Loading Screen -->
-    <div class="loading-screen" id="loadingScreen">
+    <div class="loading-screen" :class="{ active: screen === 'loading' }">
         <div class="spinner"></div>
         <p>Extracting telemetry data...</p>
     </div>
 
     <!-- Video Container with HUD -->
-    <div class="video-container" id="videoContainer">
+    <div class="video-container" :class="{ active: screen === 'video' }">
         <div class="video-wrapper">
-            <div class="video-content-box" id="videoContentBox">
-                <video id="video" playsinline></video>
+            <div class="video-content-box" x-ref="videoContentBox">
+                <video x-ref="video" playsinline @loadedmetadata="onVideoLoaded()" @play="onPlay()" @pause="onPause()" @ended="onEnded()" @seeked="onSeeked()"></video>
 
-                <!-- Vertical Pedal Bar (Tesla Energy Display style) -->
-                <div class="pedal-bar-vertical" id="pedalBarVertical">
+                <!-- Vertical Pedal Bar -->
+                <div class="pedal-bar-vertical">
                     <div class="pedal-bar-vertical-top">
-                        <div class="pedal-bar-vertical-throttle" id="throttleBar" style="height: 0%"></div>
+                        <div class="pedal-bar-vertical-throttle" :style="{ height: throttle + '%' }"></div>
                     </div>
                     <div class="pedal-bar-vertical-bottom">
-                        <div class="pedal-bar-vertical-brake" id="brakeBar" style="height: 0%"></div>
+                        <div class="pedal-bar-vertical-brake" :style="{ height: brakeOn ? '100%' : '0%' }"></div>
                     </div>
                     <div class="pedal-bar-vertical-center"></div>
                 </div>
 
                 <div class="hud-overlay">
-            <!-- Top Row with Speed Display -->
-            <div class="hud-top">
-                <!-- Speed Display -->
-                <div class="hud-card speedometer-hud">
-                    <div class="speed-display" id="speedDisplay" title="Click to toggle KM/H / MPH">
-                        <span class="speed-number" id="speedValue">0</span>
-                        <span class="speed-unit" id="speedUnit">KM/H</span>
+                    <!-- Top Row with Speed Display -->
+                    <div class="hud-top">
+                        <div class="hud-card speedometer-hud">
+                            <div class="speed-display" @click="useMetric = !useMetric" title="Click to toggle KM/H / MPH">
+                                <span class="speed-number" :style="{ color: speedColor }" x-text="displaySpeed"></span>
+                                <span class="speed-unit" x-text="useMetric ? 'KM/H' : 'MPH'"></span>
+                            </div>
+                            <div class="autopilot-hud">
+                                <span class="status-indicator" :class="apActive ? 'active' : 'inactive'"></span>
+                                <span class="ap-label" x-text="apStatus"></span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="autopilot-hud" id="autopilotHud">
-                        <span class="status-indicator" id="apIndicatorHud"></span>
-                        <span class="ap-label" id="apStatusHud">OFF</span>
-                    </div>
+                    <div class="hud-bottom"></div>
                 </div>
-            </div>
 
-
-                <!-- Bottom Controls (empty now) -->
-                <div class="hud-bottom">
-                </div>
-            </div>
-
-                <!-- Camera Navigation (carousel-style) -->
-                <div class="camera-navigation single-camera" id="cameraNavigation">
+                <!-- Camera Navigation -->
+                <div class="camera-navigation" :class="{ 'single-camera': cameras.length <= 1 }">
                     <div class="camera-nav-bottom">
                         <div class="camera-nav-row">
-                            <button class="nav-arrow" id="prevCamera" disabled>
+                            <button class="nav-arrow" @click="switchCamera(currentCameraIndex - 1)" :disabled="currentCameraIndex === 0">
                                 <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
                             </button>
-                            <div class="camera-dots" id="cameraDots">
-                                <!-- Dots generated dynamically -->
+                            <div class="camera-dots">
+                                <template x-for="(cam, i) in cameras" :key="i">
+                                    <div class="camera-dot" :class="{ active: i === currentCameraIndex }" @click="switchCamera(i)" :title="cam.label"></div>
+                                </template>
                             </div>
-                            <button class="nav-arrow" id="nextCamera" disabled>
+                            <button class="nav-arrow" @click="switchCamera(currentCameraIndex + 1)" :disabled="currentCameraIndex === cameras.length - 1">
                                 <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
                             </button>
                         </div>
-                        <span class="camera-nav-label" id="cameraNavLabel">Front</span>
+                        <span class="camera-nav-label" x-text="currentCamera?.label || 'Camera'"></span>
                     </div>
                 </div>
             </div>
@@ -1158,23 +1221,24 @@
         <div class="controls-bar">
             <div class="scrubber-row">
                 <div class="scrubber-container">
-                    <input type="range" class="scrubber" id="scrubber" min="0" max="100" value="0" step="0.1">
-                    <span class="time-display" id="timeDisplay">0:00 / 0:00</span>
+                    <input type="range" class="scrubber" min="0" :max="videoDuration" step="0.1" x-model="currentTime" @input="seekTo($event.target.value)">
+                    <span class="time-display" x-text="timeDisplay"></span>
                 </div>
             </div>
             <div class="controls-row">
-                <button class="drawer-toggle" id="drawerToggle">
+                <button class="drawer-toggle" @click="drawerOpen = !drawerOpen" :class="{ open: drawerOpen }">
                     <span>Details</span>
                     <span class="arrow">▼</span>
                 </button>
                 <div class="playback-controls">
-                    <button class="frame-btn" id="prevFrameBtn" title="Previous frame (,)">
+                    <button class="frame-btn" @click="stepFrame(-1)" title="Previous frame (,)">
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
                     </button>
-                    <button class="play-btn" id="playBtn">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    <button class="play-btn" @click="togglePlay()">
+                        <svg x-show="!isPlaying" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                        <svg x-show="isPlaying" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
                     </button>
-                    <button class="frame-btn" id="nextFrameBtn" title="Next frame (.)">
+                    <button class="frame-btn" @click="stepFrame(1)" title="Next frame (.)">
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
                     </button>
                 </div>
@@ -1182,18 +1246,18 @@
         </div>
 
         <!-- Collapsible Drawer with Tabs -->
-        <div class="drawer-container" id="drawerContainer">
+        <div class="drawer-container" :class="{ open: drawerOpen }">
             <div class="drawer-tabs">
-                <button class="drawer-tab active" data-tab="gforce">G-Force</button>
-                <button class="drawer-tab" data-tab="speed">Speed</button>
-                <button class="drawer-tab" data-tab="status">Status</button>
-                <button class="drawer-tab" data-tab="playback">Playback</button>
-                <button class="drawer-tab" data-tab="map" id="mapTab">Map</button>
-                <button class="drawer-tab" data-tab="export">Export</button>
+                <button class="drawer-tab" :class="{ active: activeTab === 'gforce' }" @click="switchTab('gforce')">G-Force</button>
+                <button class="drawer-tab" :class="{ active: activeTab === 'speed' }" @click="switchTab('speed')">Speed</button>
+                <button class="drawer-tab" :class="{ active: activeTab === 'status' }" @click="switchTab('status')">Status</button>
+                <button class="drawer-tab" :class="{ active: activeTab === 'playback' }" @click="switchTab('playback')">Playback</button>
+                <button class="drawer-tab" :class="{ active: activeTab === 'map', hidden: !hasGPS }" @click="switchTab('map')">Map</button>
+                <button class="drawer-tab" :class="{ active: activeTab === 'export' }" @click="switchTab('export')">Export</button>
             </div>
             <div class="drawer-content">
                 <!-- G-Force Tab -->
-                <div class="tab-panel active" data-tab="gforce">
+                <div class="tab-panel" :class="{ active: activeTab === 'gforce' }">
                     <div class="gforce-panel-layout">
                         <div class="gforce-labels-container">
                             <span class="gforce-axis-label vertical">Left</span>
@@ -1203,11 +1267,11 @@
                                     <div class="gforce-ring r1"></div>
                                     <div class="gforce-ring r2"></div>
                                     <div class="gforce-ring r3"></div>
-                                    <span class="gforce-ring-label r1-label" id="gforceLabel1"></span>
-                                    <span class="gforce-ring-label r2-label" id="gforceLabel2"></span>
-                                    <span class="gforce-ring-label r3-label" id="gforceLabel3"></span>
-                                    <canvas class="gforce-trail-canvas" id="gforceTrailCanvas"></canvas>
-                                    <div class="gforce-dot" id="gforceDot"></div>
+                                    <span class="gforce-ring-label r1-label" x-text="gforceLabel1"></span>
+                                    <span class="gforce-ring-label r2-label" x-text="gforceLabel2"></span>
+                                    <span class="gforce-ring-label r3-label" x-text="gforceLabel3"></span>
+                                    <canvas class="gforce-trail-canvas" x-ref="gforceCanvas"></canvas>
+                                    <div class="gforce-dot" :style="gforceDotStyle"></div>
                                 </div>
                                 <span class="gforce-axis-label">Back</span>
                             </div>
@@ -1216,75 +1280,71 @@
                         <div class="gforce-raw-values">
                             <div class="gforce-raw-item">
                                 <span class="gforce-raw-label">X (Lat)</span>
-                                <span class="gforce-raw-value" id="gforceRawX">0.00g</span>
+                                <span class="gforce-raw-value" x-text="gforceRawX"></span>
                             </div>
                             <div class="gforce-raw-item">
                                 <span class="gforce-raw-label">Y (Lon)</span>
-                                <span class="gforce-raw-value" id="gforceRawY">0.00g</span>
+                                <span class="gforce-raw-value" x-text="gforceRawY"></span>
                             </div>
                             <div class="gforce-raw-item">
                                 <span class="gforce-raw-label">Z (Vert)</span>
-                                <span class="gforce-raw-value" id="gforceRawZ">0.00g</span>
+                                <span class="gforce-raw-value" x-text="gforceRawZ"></span>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Speed History Tab -->
-                <div class="tab-panel" data-tab="speed">
+                <div class="tab-panel" :class="{ active: activeTab === 'speed' }">
                     <div class="drawer-sparkline-container">
-                        <svg class="speed-sparkline" id="speedSparkline" viewBox="0 0 200 40" preserveAspectRatio="none">
+                        <svg class="speed-sparkline" viewBox="0 0 200 40" preserveAspectRatio="none">
                             <defs>
-                                <linearGradient id="sparklineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                    <stop offset="0%" class="speed-sparkline-gradient-low" />
-                                    <stop offset="50%" class="speed-sparkline-gradient-mid" />
-                                    <stop offset="100%" class="speed-sparkline-gradient-high" />
-                                </linearGradient>
+                                <linearGradient id="sparklineGradient" x1="0%" y1="0%" x2="100%" y2="0%" x-html="sparklineGradientStops"></linearGradient>
                                 <linearGradient id="sparklineAreaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
                                     <stop offset="0%" stop-color="#fff" stop-opacity="0.3" />
                                     <stop offset="100%" stop-color="#fff" stop-opacity="0" />
                                 </linearGradient>
                             </defs>
-                            <path class="speed-sparkline-area" id="sparklineArea" fill="url(#sparklineAreaGradient)" />
-                            <path class="speed-sparkline-path" id="sparklinePath" stroke="url(#sparklineGradient)" />
+                            <path class="speed-sparkline-area" :d="sparklineAreaPath" fill="url(#sparklineAreaGradient)" />
+                            <path class="speed-sparkline-path" :d="sparklinePath" stroke="url(#sparklineGradient)" />
                         </svg>
                     </div>
                 </div>
 
                 <!-- Status Tab -->
-                <div class="tab-panel" data-tab="status">
+                <div class="tab-panel" :class="{ active: activeTab === 'status' }">
                     <div class="drawer-status-row">
                         <span class="drawer-status-label">Gear</span>
-                        <span class="drawer-status-value" id="gearStatus">D</span>
+                        <span class="drawer-status-value" x-text="gear"></span>
                     </div>
                     <div class="drawer-status-row">
                         <span class="drawer-status-label">Steering</span>
-                        <span class="drawer-status-value"><span id="steeringValue">0</span>°</span>
+                        <span class="drawer-status-value" x-text="steering + '°'"></span>
                     </div>
                 </div>
 
                 <!-- Playback Tab -->
-                <div class="tab-panel" data-tab="playback">
+                <div class="tab-panel" :class="{ active: activeTab === 'playback' }">
                     <div class="drawer-info-item">
                         <span class="drawer-info-label">Frame</span>
-                        <span class="drawer-info-value" id="frameInfo">0 / 0</span>
+                        <span class="drawer-info-value" x-text="frameInfo"></span>
                     </div>
                 </div>
 
                 <!-- Map Tab -->
-                <div class="tab-panel" data-tab="map" id="minimapSection">
-                    <div class="minimap-container" id="minimapContainer">
-                        <div class="minimap" id="minimap"></div>
+                <div class="tab-panel" :class="{ active: activeTab === 'map', 'no-gps': !hasGPS }">
+                    <div class="minimap-container">
+                        <div class="minimap" x-ref="minimap"></div>
                     </div>
                     <div class="drawer-info-item">
                         <span class="drawer-info-label">Coordinates</span>
-                        <span class="drawer-info-value" id="locationInfo">--</span>
+                        <span class="drawer-info-value" x-text="locationInfo"></span>
                     </div>
                 </div>
 
                 <!-- Export Tab -->
-                <div class="tab-panel" data-tab="export">
-                    <button class="download-btn" id="downloadBtn">Download CSV</button>
+                <div class="tab-panel" :class="{ active: activeTab === 'export' }">
+                    <button class="download-btn" @click="downloadCSV()">Download CSV</button>
                 </div>
             </div>
         </div>
@@ -1296,10 +1356,8 @@
         // Based on https://github.com/teslamotors/dashcam
         // ============================================
 
-        // Protobuf schema for Tesla SEI metadata
         const PROTO_SCHEMA = `
             syntax = "proto3";
-
             message SeiMetadata {
                 uint32 version = 1;
                 Gear gear_state = 2;
@@ -1318,28 +1376,13 @@
                 double linear_acceleration_mps2_y = 15;
                 double linear_acceleration_mps2_z = 16;
             }
-
-            enum Gear {
-                GEAR_PARK = 0;
-                GEAR_DRIVE = 1;
-                GEAR_REVERSE = 2;
-                GEAR_NEUTRAL = 3;
-            }
-
-            enum AutopilotState {
-                NONE = 0;
-                SELF_DRIVING = 1;
-                AUTOSTEER = 2;
-                TACC = 3;
-            }
+            enum Gear { GEAR_PARK = 0; GEAR_DRIVE = 1; GEAR_REVERSE = 2; GEAR_NEUTRAL = 3; }
+            enum AutopilotState { NONE = 0; SELF_DRIVING = 1; AUTOSTEER = 2; TACC = 3; }
         `;
 
         let SeiMetadata = null;
-
-        // Initialize protobuf
         async function initProtobuf() {
-            const root = protobuf.parse(PROTO_SCHEMA).root;
-            SeiMetadata = root.lookupType('SeiMetadata');
+            SeiMetadata = protobuf.parse(PROTO_SCHEMA).root.lookupType('SeiMetadata');
         }
 
         // MP4 Box Parser
@@ -1348,155 +1391,75 @@
                 this.buffer = buffer;
                 this.view = new DataView(buffer);
             }
-
             findBox(start, end, name) {
                 let offset = start;
                 while (offset < end) {
                     const size = this.view.getUint32(offset);
                     const type = this.getString(offset + 4, 4);
-
                     if (size === 0) break;
-                    if (size === 1) {
-                        // 64-bit size - skip for now
-                        offset += 16;
-                        continue;
-                    }
-
-                    if (type === name) {
-                        return { offset, size, type };
-                    }
+                    if (size === 1) { offset += 16; continue; }
+                    if (type === name) return { offset, size, type };
                     offset += size;
                 }
                 return null;
             }
-
-            findBoxes(start, end, name) {
-                const boxes = [];
-                let offset = start;
-                while (offset < end) {
-                    const size = this.view.getUint32(offset);
-                    const type = this.getString(offset + 4, 4);
-
-                    if (size === 0) break;
-                    if (size === 1) {
-                        offset += 16;
-                        continue;
-                    }
-
-                    if (type === name) {
-                        boxes.push({ offset, size, type });
-                    }
-                    offset += size;
-                }
-                return boxes;
-            }
-
             getString(offset, length) {
                 let str = '';
-                for (let i = 0; i < length; i++) {
-                    str += String.fromCharCode(this.view.getUint8(offset + i));
-                }
+                for (let i = 0; i < length; i++) str += String.fromCharCode(this.view.getUint8(offset + i));
                 return str;
             }
-
             getTimescaleAndDurations() {
-                // Find moov box
                 const moov = this.findBox(0, this.buffer.byteLength, 'moov');
                 if (!moov) return null;
-
-                // Find first trak (video track)
                 const trak = this.findBox(moov.offset + 8, moov.offset + moov.size, 'trak');
                 if (!trak) return null;
-
-                // Find mdia
                 const mdia = this.findBox(trak.offset + 8, trak.offset + trak.size, 'mdia');
                 if (!mdia) return null;
-
-                // Find mdhd for timescale
                 const mdhd = this.findBox(mdia.offset + 8, mdia.offset + mdia.size, 'mdhd');
                 if (!mdhd) return null;
-
                 const mdhdOffset = mdhd.offset + 8;
                 const version = this.view.getUint8(mdhdOffset);
-                let timescale;
-
-                if (version === 0) {
-                    timescale = this.view.getUint32(mdhdOffset + 12);
-                } else {
-                    timescale = this.view.getUint32(mdhdOffset + 20);
-                }
-
-                // Find minf -> stbl -> stts for frame durations
+                const timescale = version === 0 ? this.view.getUint32(mdhdOffset + 12) : this.view.getUint32(mdhdOffset + 20);
                 const minf = this.findBox(mdia.offset + 8, mdia.offset + mdia.size, 'minf');
                 if (!minf) return { timescale, durations: [] };
-
                 const stbl = this.findBox(minf.offset + 8, minf.offset + minf.size, 'stbl');
                 if (!stbl) return { timescale, durations: [] };
-
                 const stts = this.findBox(stbl.offset + 8, stbl.offset + stbl.size, 'stts');
                 if (!stts) return { timescale, durations: [] };
-
-                // Parse stts
                 const sttsOffset = stts.offset + 8;
                 const entryCount = this.view.getUint32(sttsOffset + 4);
                 const durations = [];
-
                 let pos = sttsOffset + 8;
                 for (let i = 0; i < entryCount; i++) {
                     const sampleCount = this.view.getUint32(pos);
                     const sampleDelta = this.view.getUint32(pos + 4);
-                    for (let j = 0; j < sampleCount; j++) {
-                        durations.push(sampleDelta);
-                    }
+                    for (let j = 0; j < sampleCount; j++) durations.push(sampleDelta);
                     pos += 8;
                 }
-
                 return { timescale, durations };
             }
-
-            getMdatInfo() {
-                const mdat = this.findBox(0, this.buffer.byteLength, 'mdat');
-                return mdat;
-            }
+            getMdatInfo() { return this.findBox(0, this.buffer.byteLength, 'mdat'); }
         }
 
-        // SEI Extractor - FIXED to match Tesla's reference implementation
         function extractSEI(buffer, mdatOffset, mdatSize) {
             const view = new DataView(buffer);
             const seiMessages = [];
             let cursor = mdatOffset + 8;
             const end = mdatOffset + mdatSize;
-
             while (cursor + 4 <= end) {
-                // Read NAL unit size (4 bytes, big-endian)
                 const nalSize = view.getUint32(cursor);
                 cursor += 4;
-
-                if (nalSize < 2 || cursor + nalSize > view.byteLength) {
-                    cursor += Math.max(nalSize, 0);
-                    continue;
-                }
-
-                // Check NAL type (first byte & 0x1F) is 6 (SEI) AND
-                // payload type (second byte) is 5 (user_data_unregistered)
+                if (nalSize < 2 || cursor + nalSize > view.byteLength) { cursor += Math.max(nalSize, 0); continue; }
                 const nalType = view.getUint8(cursor) & 0x1F;
                 const payloadType = view.getUint8(cursor + 1);
-
                 if (nalType === 6 && payloadType === 5) {
-                    const seiData = new Uint8Array(buffer.slice(cursor, cursor + nalSize));
-                    const decoded = decodeSEI(seiData);
-                    if (decoded) {
-                        seiMessages.push(decoded);
-                    }
+                    const decoded = decodeSEI(new Uint8Array(buffer.slice(cursor, cursor + nalSize)));
+                    if (decoded) seiMessages.push(decoded);
                 }
-
                 cursor += nalSize;
             }
-
             return seiMessages;
         }
-
-        // Decode SEI message - FIXED to use Tesla's magic marker (0x42...0x69)
         function decodeSEI(nal) {
             if (!SeiMetadata || nal.length < 4) return null;
 
@@ -1530,1127 +1493,469 @@
             }
         }
 
-        // Remove H.264 emulation prevention bytes
         function removeEmulationPrevention(data) {
             const result = [];
             for (let i = 0; i < data.length; i++) {
-                if (i >= 2 && data[i - 2] === 0x00 && data[i - 1] === 0x00 && data[i] === 0x03) {
-                    continue; // Skip emulation prevention byte
-                }
+                if (i >= 2 && data[i - 2] === 0x00 && data[i - 1] === 0x00 && data[i] === 0x03) continue;
                 result.push(data[i]);
             }
             return new Uint8Array(result);
         }
 
-        // ============================================
-        // Centralized State Management
-        // ============================================
-
-        const state = {
-            // Core data
-            cameras: [],           // Array of {file, url, label, telemetry, frameTimestamps}
-            currentCameraIndex: 0,
-            currentFrame: 0,
-
-            // UI preferences
-            useMetric: true,
-
-            // Visualization history
-            speedHistory: [],
-            gforceHistory: [],
-
-            // Playback tracking
-            lastDisplayedFrame: -1,
-
-            // Cached derived state (invalidated on camera switch)
-            _statsCache: null,
-            _statsCameraIndex: -1,
-        };
-
-        // Constants
-        const SPARKLINE_HISTORY_SECONDS = 8;
-        const SPARKLINE_POINTS = 60;
-        const GFORCE_TRAIL_LENGTH = 20;
-
-        // ============================================
-        // State Accessors (Getters)
-        // ============================================
-
-        function getCurrentCamera() {
-            return state.cameras[state.currentCameraIndex];
-        }
-
-        function getTelemetry() {
-            return getCurrentCamera()?.telemetry || [];
-        }
-
-        function getFrameTimestamps() {
-            return getCurrentCamera()?.frameTimestamps || [];
-        }
-
-        function getCurrentFrameData() {
-            return getTelemetry()[state.currentFrame] || null;
-        }
-
-        function getSessionStats() {
-            // Compute and cache (invalidate on camera switch)
-            if (!state._statsCache || state._statsCameraIndex !== state.currentCameraIndex) {
-                state._statsCache = computeSessionStats(getTelemetry());
-                state._statsCameraIndex = state.currentCameraIndex;
-            }
-            return state._statsCache;
-        }
-
-        function computeSessionStats(telemetry) {
-            let minSpeed = Infinity;
-            let maxSpeed = 0;
-            let maxThrottle = 0;
-            let maxGforce = 0;
-
-            for (const frame of telemetry) {
-                const speedKmh = (frame.vehicleSpeedMps || 0) * 3.6;
-                if (speedKmh < minSpeed) minSpeed = speedKmh;
-                if (speedKmh > maxSpeed) maxSpeed = speedKmh;
-
-                const throttle = frame.acceleratorPedalPosition || 0;
-                if (throttle > maxThrottle) maxThrottle = throttle;
-
-                const gX = frame.linearAccelerationMps2X || 0;
-                const gY = frame.linearAccelerationMps2Y || 0;
-                const gTotal = Math.sqrt(gX * gX + gY * gY) / 9.81;
-                if (gTotal > maxGforce) maxGforce = gTotal;
-            }
-
-            return {
-                minSpeed: minSpeed === Infinity ? 0 : minSpeed,
-                maxSpeed: maxSpeed || 60,
-                maxThrottle: maxThrottle || 50,
-                maxGforce: maxGforce || 1.0,
-            };
-        }
-
-        function hasGPSData() {
-            return getTelemetry().some(f =>
-                f.latitudeDeg && f.longitudeDeg &&
-                (f.latitudeDeg !== 0 || f.longitudeDeg !== 0)
-            );
-        }
-
-        // ============================================
-        // State Mutations
-        // ============================================
-
-        function setCurrentCamera(index) {
-            if (index < 0 || index >= state.cameras.length) return null;
-            state.currentCameraIndex = index;
-            state._statsCache = null; // Invalidate derived state
-            return getCurrentCamera();
-        }
-
-        function setCurrentFrame(frameIndex) {
-            const max = getTelemetry().length - 1;
-            state.currentFrame = Math.max(0, Math.min(frameIndex, max));
-        }
-
-        function addSpeedToHistory(speedKmh) {
-            state.speedHistory.push(speedKmh);
-            if (state.speedHistory.length > SPARKLINE_POINTS) {
-                state.speedHistory.shift();
-            }
-        }
-
-        function addGforceToHistory(gX, gY) {
-            state.gforceHistory.push({ x: gX, y: gY });
-            if (state.gforceHistory.length > GFORCE_TRAIL_LENGTH) {
-                state.gforceHistory.shift();
-            }
-        }
-
-        function rebuildHistory(fromFrame) {
-            state.speedHistory = [];
-            state.gforceHistory = [];
-            const telemetry = getTelemetry();
-            const start = Math.max(0, fromFrame - SPARKLINE_POINTS);
-
-            for (let i = start; i <= fromFrame && i < telemetry.length; i++) {
-                const d = telemetry[i];
-                state.speedHistory.push((d.vehicleSpeedMps || 0) * 3.6);
-                state.gforceHistory.push({
-                    x: d.linearAccelerationMps2X || 0,
-                    y: d.linearAccelerationMps2Y || 0
-                });
-            }
-        }
-
-        // ============================================
-        // Runtime Instances (not state)
-        // ============================================
-
-        let gforceTrailCtx = null;  // Canvas 2D context
-        let minimap = null;         // GPSMinimap instance
-
-        // ============================================
-        // GPS Minimap Class
-        // ============================================
-        class GPSMinimap {
-            constructor(containerId) {
-                this.container = document.getElementById(containerId);
-                this.map = null;
-                this.routeLine = null;
-                this.vehicleMarker = null;
-                this.gpsPoints = [];
-                this.initialized = false;
-            }
-
-            initialize() {
-                if (this.initialized || !this.container) return;
-
-                try {
-                    // Create Leaflet map with a default view
-                    this.map = L.map(this.container, {
-                        zoomControl: false,
-                        attributionControl: false,
-                        dragging: false,
-                        scrollWheelZoom: false,
-                        doubleClickZoom: false,
-                        touchZoom: false,
-                        keyboard: false
-                    }).setView([0, 0], 2); // Set initial view
-
-                    // Always add tiles - they'll be hidden by CSS for transparent style
-                    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                        maxZoom: 19,
-                        subdomains: 'abcd'
-                    }).addTo(this.map);
-
-                    // Create vehicle marker (Tesla red dot)
-                    const vehicleIcon = L.divIcon({
-                        className: 'vehicle-marker',
-                        html: '<div class="vehicle-dot"></div>',
-                        iconSize: [12, 12],
-                        iconAnchor: [6, 6]
-                    });
-                    this.vehicleMarker = L.marker([0, 0], { icon: vehicleIcon });
-
-                    // Route line style
-                    this.routeLine = L.polyline([], {
-                        color: '#e82127',
-                        weight: 2,
-                        opacity: 0.8
-                    });
-
-                    this.initialized = true;
-                } catch (e) {
-                    console.error('Failed to initialize minimap:', e);
-                }
-            }
-
-            buildRoute(telemetryFrames) {
-                if (!this.initialized || !this.map) return false;
-
-                // Extract GPS points from telemetry
-                this.gpsPoints = telemetryFrames
-                    .filter(f => f.latitudeDeg && f.longitudeDeg &&
-                           (f.latitudeDeg !== 0 || f.longitudeDeg !== 0))
-                    .map(f => [f.latitudeDeg, f.longitudeDeg]);
-
-                if (this.gpsPoints.length === 0) {
-                    return false;
-                }
-
-                // Draw route
-                this.routeLine.setLatLngs(this.gpsPoints);
-                this.routeLine.addTo(this.map);
-
-                // Add vehicle marker at first position
-                this.vehicleMarker.setLatLng(this.gpsPoints[0]);
-                this.vehicleMarker.addTo(this.map);
-
-                // Store bounds for later reference
-                this.routeBounds = this.routeLine.getBounds();
-
-                // Fit map to route bounds after a short delay to ensure container is rendered
-                setTimeout(() => {
-                    this.map.invalidateSize();
-                    this.map.fitBounds(this.routeBounds, { padding: [15, 15] });
-                }, 100);
-
-                return true;
-            }
-
-            updatePosition(lat, lng, heading = 0) {
-                if (!this.initialized || !lat || !lng || (lat === 0 && lng === 0)) return;
-
-                // Just update marker position - don't pan/zoom the map
-                this.vehicleMarker.setLatLng([lat, lng]);
-            }
-
-            hasGPSData() {
-                return this.gpsPoints.length > 0;
-            }
-        }
-
-        // Detect camera source from filename
-        // Higher specificity matches take precedence (e.g., "left_pillar" > "left")
         function detectCameraSource(filename) {
             const name = filename.toLowerCase().replace(/[-_]/g, ' ');
-
-            // Patterns ordered by specificity (most specific first)
             const patterns = [
                 { pattern: /left\s*pillar/, label: 'Left Pillar' },
                 { pattern: /right\s*pillar/, label: 'Right Pillar' },
                 { pattern: /left\s*repeater/, label: 'Left Repeater' },
                 { pattern: /right\s*repeater/, label: 'Right Repeater' },
-                { pattern: /pillar\s*left/, label: 'Left Pillar' },
-                { pattern: /pillar\s*right/, label: 'Right Pillar' },
-                { pattern: /repeater\s*left/, label: 'Left Repeater' },
-                { pattern: /repeater\s*right/, label: 'Right Repeater' },
                 { pattern: /\bleft\b/, label: 'Left' },
                 { pattern: /\bright\b/, label: 'Right' },
                 { pattern: /\bfront\b/, label: 'Front' },
                 { pattern: /\bback\b/, label: 'Back' },
                 { pattern: /\brear\b/, label: 'Rear' },
             ];
-
-            for (const { pattern, label } of patterns) {
-                if (pattern.test(name)) {
-                    return label;
-                }
-            }
-
+            for (const { pattern, label } of patterns) if (pattern.test(name)) return label;
             return null;
         }
 
-        function updateCameraLabel(filename) {
-            const label = detectCameraSource(filename) || 'Camera';
-            const navLabel = document.getElementById('cameraNavLabel');
-            if (navLabel) {
-                navLabel.textContent = label;
-            }
-        }
-
-        // ============================================
-        // Camera Navigation Functions
-        // ============================================
-        function initCameraNavigation() {
-            const dotsContainer = document.getElementById('cameraDots');
-            const navContainer = document.getElementById('cameraNavigation');
-            const prevBtn = document.getElementById('prevCamera');
-            const nextBtn = document.getElementById('nextCamera');
-
-            // Show/hide navigation based on camera count
-            if (state.cameras.length <= 1) {
-                navContainer.classList.add('single-camera');
-                return;
-            }
-            navContainer.classList.remove('single-camera');
-
-            // Generate dots for loaded cameras
-            dotsContainer.innerHTML = state.cameras.map((cam, i) =>
-                `<div class="camera-dot ${i === state.currentCameraIndex ? 'active' : ''}"
-                      data-index="${i}" title="${cam.label}"></div>`
-            ).join('');
-
-            // Dot click handlers
-            dotsContainer.querySelectorAll('.camera-dot').forEach(dot => {
-                dot.addEventListener('click', () => switchCamera(parseInt(dot.dataset.index)));
-            });
-
-            // Arrow button handlers
-            prevBtn.onclick = () => switchCamera(state.currentCameraIndex - 1);
-            nextBtn.onclick = () => switchCamera(state.currentCameraIndex + 1);
-
-            updateNavButtons();
-        }
-
-        function switchCamera(index) {
-            const camera = setCurrentCamera(index);
-            if (!camera) return;
-
-            const currentTime = video.currentTime;
-            const wasPlaying = !video.paused;
-
-            // Update video source
-            video.src = camera.url;
-
-            // Wait for video to load then restore position
-            video.onloadedmetadata = () => {
-                video.currentTime = Math.min(currentTime, video.duration);
-                if (wasPlaying) {
-                    video.play();
-                }
-
-                // Rebuild history
-                const frame = findFrameAtTime(video.currentTime);
-                rebuildHistory(frame);
-                updateDisplay(frame);
-                updateGforceLabels();
-            };
-
-            updateCameraNavUI();
-        }
-
-        function updateCameraNavUI() {
-            const camera = getCurrentCamera();
-            document.getElementById('cameraNavLabel').textContent = camera.label;
-            document.querySelectorAll('.camera-dot').forEach((dot, i) => {
-                dot.classList.toggle('active', i === state.currentCameraIndex);
-            });
-            updateNavButtons();
-        }
-
-        function updateNavButtons() {
-            const prevBtn = document.getElementById('prevCamera');
-            const nextBtn = document.getElementById('nextCamera');
-            prevBtn.disabled = state.currentCameraIndex === 0;
-            nextBtn.disabled = state.currentCameraIndex === state.cameras.length - 1;
-        }
-
-        // DOM Elements
-        const uploadScreen = document.getElementById('uploadScreen');
-        const uploadBox = document.getElementById('uploadBox');
-        const fileInput = document.getElementById('fileInput');
-        const loadingScreen = document.getElementById('loadingScreen');
-        const videoContainer = document.getElementById('videoContainer');
-        const errorMessage = document.getElementById('errorMessage');
-        const video = document.getElementById('video');
-        const playBtn = document.getElementById('playBtn');
-        const scrubber = document.getElementById('scrubber');
-
-        // Upload handling
-        uploadBox.addEventListener('click', () => fileInput.click());
-        uploadBox.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadBox.classList.add('dragover');
-        });
-        uploadBox.addEventListener('dragleave', () => {
-            uploadBox.classList.remove('dragover');
-        });
-        uploadBox.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadBox.classList.remove('dragover');
-            const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('video/'));
-            if (files.length > 0) processVideos(files);
-        });
-        fileInput.addEventListener('change', (e) => {
-            const files = Array.from(e.target.files);
-            if (files.length > 0) processVideos(files);
-        });
-
-        // Process a single video file and return camera data
         async function processSingleVideo(file) {
             const buffer = await file.arrayBuffer();
             const parser = new MP4Parser(buffer);
-
             const timing = parser.getTimescaleAndDurations();
             if (!timing) throw new Error('Could not parse video timing');
-
             const mdat = parser.getMdatInfo();
             if (!mdat) throw new Error('Could not find video data');
-
             const seiMessages = extractSEI(buffer, mdat.offset, mdat.size);
-            if (seiMessages.length === 0) {
-                throw new Error('No telemetry data found');
-            }
-
-            // Build frame timestamps
+            if (seiMessages.length === 0) throw new Error('No telemetry data found');
             const timestamps = [];
             let time = 0;
             for (let i = 0; i < timing.durations.length; i++) {
                 timestamps.push(time / timing.timescale);
                 time += timing.durations[i];
             }
+            return { file, url: URL.createObjectURL(file), label: detectCameraSource(file.name) || 'Unknown', telemetry: seiMessages, frameTimestamps: timestamps };
+        }
 
+        const SPARKLINE_POINTS = 60, GFORCE_TRAIL_LENGTH = 20;
+
+        // GPS Minimap Class
+        class GPSMinimap {
+            constructor(container) {
+                this.container = container;
+                this.map = null;
+                this.routeLine = null;
+                this.vehicleMarker = null;
+                this.gpsPoints = [];
+                this.routeBounds = null;
+                this.initialized = false;
+            }
+            initialize() {
+                if (this.initialized || !this.container) return;
+                try {
+                    this.map = L.map(this.container, {
+                        zoomControl: false, attributionControl: false, dragging: false,
+                        scrollWheelZoom: false, doubleClickZoom: false, touchZoom: false, keyboard: false
+                    }).setView([0, 0], 2);
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19, subdomains: 'abcd' }).addTo(this.map);
+                    const vehicleIcon = L.divIcon({ className: 'vehicle-marker', html: '<div class="vehicle-dot"></div>', iconSize: [12, 12], iconAnchor: [6, 6] });
+                    this.vehicleMarker = L.marker([0, 0], { icon: vehicleIcon });
+                    this.routeLine = L.polyline([], { color: '#e82127', weight: 2, opacity: 0.8 });
+                    this.initialized = true;
+                } catch (e) { console.error('Failed to initialize minimap:', e); }
+            }
+            buildRoute(telemetryFrames) {
+                if (!this.initialized || !this.map) return false;
+                this.gpsPoints = telemetryFrames.filter(f => f.latitudeDeg && f.longitudeDeg && (f.latitudeDeg !== 0 || f.longitudeDeg !== 0)).map(f => [f.latitudeDeg, f.longitudeDeg]);
+                if (this.gpsPoints.length === 0) return false;
+                this.routeLine.setLatLngs(this.gpsPoints).addTo(this.map);
+                this.vehicleMarker.setLatLng(this.gpsPoints[0]).addTo(this.map);
+                this.routeBounds = this.routeLine.getBounds();
+                setTimeout(() => { this.map.invalidateSize(); this.map.fitBounds(this.routeBounds, { padding: [15, 15] }); }, 100);
+                return true;
+            }
+            updatePosition(lat, lng) {
+                if (!this.initialized || !lat || !lng || (lat === 0 && lng === 0)) return;
+                this.vehicleMarker.setLatLng([lat, lng]);
+            }
+            hasGPSData() { return this.gpsPoints.length > 0; }
+        }
+
+        // Alpine.js Application
+        function telemetryApp() {
             return {
-                file: file,
-                url: URL.createObjectURL(file),
-                label: detectCameraSource(file.name) || 'Unknown',
-                telemetry: seiMessages,
-                frameTimestamps: timestamps
-            };
-        }
+                // Screen state
+                screen: 'upload',
+                showError: false,
+                isDragging: false,
 
-        // Process multiple video files
-        async function processVideos(files) {
-            errorMessage.classList.remove('active');
-            uploadScreen.style.display = 'none';
-            loadingScreen.classList.add('active');
+                // Data
+                cameras: [],
+                currentCameraIndex: 0,
+                currentFrame: 0,
 
-            try {
-                // Initialize protobuf
-                await initProtobuf();
+                // UI state
+                useMetric: true,
+                drawerOpen: false,
+                activeTab: 'gforce',
+                isPlaying: false,
+                currentTime: 0,
+                videoDuration: 0,
 
-                // Reset state
-                state.cameras = [];
-                state.currentCameraIndex = 0;
-                state.currentFrame = 0;
-                state.speedHistory = [];
-                state.gforceHistory = [];
-                state._statsCache = null;
+                // Telemetry display values
+                speedKmh: 0,
+                throttle: 0,
+                brakeOn: false,
+                gX: 0, gY: 0, gZ: 0,
+                apState: 'NONE',
+                gearState: 'GEAR_DRIVE',
+                steeringAngle: 0,
+                lat: 0, lng: 0,
 
-                // Process each file
-                for (const file of files) {
+                // History for visualizations
+                speedHistory: [],
+                gforceHistory: [],
+                _statsCache: null,
+
+                // Runtime
+                animationFrameId: null,
+                gforceCtx: null,
+                minimap: null,
+
+                // Computed properties
+                get currentCamera() { return this.cameras[this.currentCameraIndex]; },
+                get telemetry() { return this.currentCamera?.telemetry || []; },
+                get frameTimestamps() { return this.currentCamera?.frameTimestamps || []; },
+                get currentFrameData() { return this.telemetry[this.currentFrame] || null; },
+
+                get stats() {
+                    if (!this._statsCache) {
+                        let minSpeed = Infinity, maxSpeed = 0, maxGforce = 0;
+                        for (const f of this.telemetry) {
+                            const s = (f.vehicleSpeedMps || 0) * 3.6;
+                            if (s < minSpeed) minSpeed = s;
+                            if (s > maxSpeed) maxSpeed = s;
+                            const gTotal = Math.sqrt((f.linearAccelerationMps2X || 0) ** 2 + (f.linearAccelerationMps2Y || 0) ** 2) / 9.81;
+                            if (gTotal > maxGforce) maxGforce = gTotal;
+                        }
+                        this._statsCache = { minSpeed: minSpeed === Infinity ? 0 : minSpeed, maxSpeed: maxSpeed || 60, maxGforce: maxGforce || 1.0 };
+                    }
+                    return this._statsCache;
+                },
+
+                get hasGPS() {
+                    return this.telemetry.some(f => f.latitudeDeg && f.longitudeDeg && (f.latitudeDeg !== 0 || f.longitudeDeg !== 0));
+                },
+
+                get displaySpeed() {
+                    const speed = this.useMetric ? this.speedKmh : this.speedKmh * 0.621371;
+                    return speed.toFixed(1);
+                },
+
+                get speedColor() {
+                    const range = this.stats.maxSpeed - this.stats.minSpeed;
+                    const norm = range > 0 ? Math.max(0, Math.min(1, (this.speedKmh - this.stats.minSpeed) / range)) : 0;
+                    let r, g, b;
+                    if (norm < 0.5) {
+                        const t = norm * 2;
+                        r = Math.round(34 + (251 - 34) * t);
+                        g = Math.round(197 + (191 - 197) * t);
+                        b = Math.round(94 + (36 - 94) * t);
+                    } else {
+                        const t = (norm - 0.5) * 2;
+                        r = Math.round(251 + (239 - 251) * t);
+                        g = Math.round(191 + (68 - 191) * t);
+                        b = Math.round(36 + (68 - 36) * t);
+                    }
+                    return `rgb(${r}, ${g}, ${b})`;
+                },
+
+                get apActive() { return this.apState === 'AUTOSTEER' || this.apState === 'SELF_DRIVING' || this.apState === 'TACC'; },
+                get apStatus() {
+                    if (this.apState === 'AUTOSTEER') return 'AUTOSTEER';
+                    if (this.apState === 'SELF_DRIVING') return 'FSD';
+                    if (this.apState === 'TACC') return 'TACC';
+                    return 'OFF';
+                },
+
+                get gear() { return { GEAR_PARK: 'P', GEAR_DRIVE: 'D', GEAR_REVERSE: 'R', GEAR_NEUTRAL: 'N' }[this.gearState] || 'D'; },
+                get steering() { return this.steeringAngle.toFixed(1); },
+                get frameInfo() { return `${this.currentFrame + 1} / ${this.telemetry.length}`; },
+                get locationInfo() { return (this.lat !== 0 || this.lng !== 0) ? `${this.lat.toFixed(5)}, ${this.lng.toFixed(5)}` : '--'; },
+                get timeDisplay() {
+                    const fmt = (s) => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
+                    return `${fmt(this.currentTime)} / ${fmt(this.videoDuration)}`;
+                },
+
+                get gforceRawX() { return (this.gX / 9.81).toFixed(4) + 'g'; },
+                get gforceRawY() { return (this.gY / 9.81).toFixed(4) + 'g'; },
+                get gforceRawZ() { return (this.gZ / 9.81).toFixed(4) + 'g'; },
+                get gforceLabel1() { return (this.stats.maxGforce / 3).toFixed(1) + 'g'; },
+                get gforceLabel2() { return ((this.stats.maxGforce * 2) / 3).toFixed(1) + 'g'; },
+                get gforceLabel3() { return this.stats.maxGforce.toFixed(1) + 'g'; },
+
+                get gforceDotStyle() {
+                    const maxG = this.stats.maxGforce || 1.0;
+                    const x = 50 + (this.gX / 9.81 / maxG) * 45;
+                    const y = 50 - (this.gY / 9.81 / maxG) * 45;
+                    return { left: `${Math.max(5, Math.min(95, x))}%`, top: `${Math.max(5, Math.min(95, y))}%` };
+                },
+
+                get sparklinePath() {
+                    if (this.speedHistory.length < 2) return '';
+                    const w = 200, h = 40, p = 2, range = this.stats.maxSpeed - this.stats.minSpeed;
+                    const pts = this.speedHistory.map((s, i) => {
+                        const x = p + (i / (SPARKLINE_POINTS - 1)) * (w - p * 2);
+                        const norm = range > 0 ? (s - this.stats.minSpeed) / range : 0.5;
+                        const y = h - p - norm * (h - p * 2);
+                        return `${x},${y}`;
+                    });
+                    return `M ${pts.join(' L ')}`;
+                },
+
+                get sparklineAreaPath() {
+                    if (this.speedHistory.length < 2) return '';
+                    const w = 200, h = 40;
+                    return `${this.sparklinePath} L ${w - 2},${h} L 2,${h} Z`;
+                },
+
+                get sparklineGradientStops() {
+                    const s = this.speedHistory[this.speedHistory.length - 1] || 0;
+                    if (s < 40) return '<stop offset="0%" stop-color="rgba(255,255,255,0.3)"/><stop offset="100%" stop-color="#fff"/>';
+                    if (s < 80) return '<stop offset="0%" stop-color="rgba(255,255,255,0.3)"/><stop offset="100%" stop-color="#fbbf24"/>';
+                    if (s < 120) return '<stop offset="0%" stop-color="rgba(251,191,36,0.3)"/><stop offset="100%" stop-color="#f97316"/>';
+                    return '<stop offset="0%" stop-color="rgba(249,115,22,0.3)"/><stop offset="100%" stop-color="#ef4444"/>';
+                },
+
+                // Event handlers
+                handleFileSelect(e) { this.processFiles(Array.from(e.target.files)); },
+                handleDrop(e) { this.isDragging = false; this.processFiles(Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('video/'))); },
+
+                async processFiles(files) {
+                    if (files.length === 0) return;
+                    this.showError = false;
+                    this.screen = 'loading';
                     try {
-                        const cameraData = await processSingleVideo(file);
-                        state.cameras.push(cameraData);
+                        await initProtobuf();
+                        this.cameras = [];
+                        for (const file of files) {
+                            try { this.cameras.push(await processSingleVideo(file)); }
+                            catch (e) { console.warn(`Failed to process ${file.name}:`, e.message); }
+                        }
+                        if (this.cameras.length === 0) throw new Error('No valid telemetry');
+                        const order = ['Front', 'Left Repeater', 'Left Pillar', 'Left', 'Back', 'Rear', 'Right', 'Right Pillar', 'Right Repeater'];
+                        this.cameras.sort((a, b) => {
+                            if (a.label === 'Unknown') return 1;
+                            if (b.label === 'Unknown') return -1;
+                            return (order.findIndex(c => a.label.includes(c)) ?? 999) - (order.findIndex(c => b.label.includes(c)) ?? 999);
+                        });
+                        this.currentCameraIndex = 0;
+                        this._statsCache = null;
+                        this.$refs.video.src = this.currentCamera.url;
                     } catch (e) {
-                        console.warn(`Failed to process ${file.name}:`, e.message);
+                        console.error('Error:', e);
+                        this.screen = 'upload';
+                        this.showError = true;
                     }
+                },
+
+                onVideoLoaded() {
+                    this.screen = 'video';
+                    this.videoDuration = this.$refs.video.duration;
+                    this.$refs.videoContentBox.style.aspectRatio = `${this.$refs.video.videoWidth} / ${this.$refs.video.videoHeight}`;
+                    this.initGforceCanvas();
+                    this.initMinimap();
+                    this.updateFrame(0);
+                },
+
+                initGforceCanvas() {
+                    const canvas = this.$refs.gforceCanvas;
+                    if (canvas) {
+                        this.gforceCtx = canvas.getContext('2d');
+                        const resize = () => { const s = canvas.parentElement?.offsetHeight || 150; canvas.width = canvas.height = s; };
+                        resize();
+                        window.addEventListener('resize', resize);
+                    }
+                },
+
+                initMinimap() {
+                    this.minimap = new GPSMinimap(this.$refs.minimap);
+                    this.minimap.initialize();
+                    for (const cam of this.cameras) {
+                        if (cam.telemetry.some(f => f.latitudeDeg && f.longitudeDeg && (f.latitudeDeg !== 0 || f.longitudeDeg !== 0))) {
+                            this.minimap.buildRoute(cam.telemetry);
+                            break;
+                        }
+                    }
+                },
+
+                onPlay() {
+                    this.isPlaying = true;
+                    const loop = () => {
+                        this.currentTime = this.$refs.video.currentTime;
+                        this.updateFrame(this.findFrameAtTime(this.currentTime));
+                        this.animationFrameId = requestAnimationFrame(loop);
+                    };
+                    loop();
+                },
+
+                onPause() {
+                    this.isPlaying = false;
+                    if (this.animationFrameId) { cancelAnimationFrame(this.animationFrameId); this.animationFrameId = null; }
+                    this.currentTime = this.$refs.video.currentTime;
+                    this.updateFrame(this.findFrameAtTime(this.currentTime));
+                },
+
+                onEnded() { this.isPlaying = false; if (this.animationFrameId) { cancelAnimationFrame(this.animationFrameId); this.animationFrameId = null; } },
+
+                onSeeked() {
+                    this.currentTime = this.$refs.video.currentTime;
+                    const frame = this.findFrameAtTime(this.currentTime);
+                    this.rebuildHistory(frame);
+                    this.updateFrame(frame);
+                },
+
+                togglePlay() {
+                    if (this.$refs.video.paused) this.$refs.video.play();
+                    else this.$refs.video.pause();
+                },
+
+                stepFrame(dir) {
+                    this.$refs.video.pause();
+                    this.$refs.video.currentTime = Math.max(0, Math.min(this.videoDuration, this.$refs.video.currentTime + dir / 30));
+                },
+
+                seekTo(time) { this.$refs.video.currentTime = parseFloat(time); },
+
+                switchCamera(index) {
+                    if (index < 0 || index >= this.cameras.length) return;
+                    const wasPlaying = this.isPlaying;
+                    const time = this.$refs.video.currentTime;
+                    this.currentCameraIndex = index;
+                    this._statsCache = null;
+                    this.$refs.video.src = this.currentCamera.url;
+                    this.$refs.video.onloadedmetadata = () => {
+                        this.$refs.video.currentTime = Math.min(time, this.$refs.video.duration);
+                        this.videoDuration = this.$refs.video.duration;
+                        if (wasPlaying) this.$refs.video.play();
+                        this.rebuildHistory(this.findFrameAtTime(this.$refs.video.currentTime));
+                    };
+                },
+
+                switchTab(tab) {
+                    this.activeTab = tab;
+                    if (tab === 'map' && this.minimap?.map) {
+                        setTimeout(() => { this.minimap.map.invalidateSize(); if (this.minimap.routeBounds) this.minimap.map.fitBounds(this.minimap.routeBounds, { padding: [15, 15] }); }, 50);
+                    }
+                    if (tab === 'gforce') this.drawGforceTrail();
+                },
+
+                findFrameAtTime(time) {
+                    const ts = this.frameTimestamps;
+                    let low = 0, high = ts.length - 1;
+                    while (low < high) {
+                        const mid = Math.floor((low + high + 1) / 2);
+                        if (ts[mid] <= time) low = mid; else high = mid - 1;
+                    }
+                    return Math.min(low, this.telemetry.length - 1);
+                },
+
+                updateFrame(frameIndex) {
+                    this.currentFrame = Math.max(0, Math.min(frameIndex, this.telemetry.length - 1));
+                    const d = this.currentFrameData;
+                    if (!d) return;
+
+                    this.speedKmh = (d.vehicleSpeedMps || 0) * 3.6;
+                    this.throttle = Math.min(Math.max(d.acceleratorPedalPosition || 0, 0), 100);
+                    this.brakeOn = d.brakeApplied === true;
+                    this.gX = d.linearAccelerationMps2X || 0;
+                    this.gY = d.linearAccelerationMps2Y || 0;
+                    this.gZ = d.linearAccelerationMps2Z || 0;
+                    this.apState = d.autopilotState || 'NONE';
+                    this.gearState = d.gearState || 'GEAR_DRIVE';
+                    this.steeringAngle = d.steeringWheelAngle || 0;
+                    this.lat = d.latitudeDeg || 0;
+                    this.lng = d.longitudeDeg || 0;
+
+                    this.speedHistory.push(this.speedKmh);
+                    if (this.speedHistory.length > SPARKLINE_POINTS) this.speedHistory.shift();
+                    this.gforceHistory.push({ x: this.gX, y: this.gY });
+                    if (this.gforceHistory.length > GFORCE_TRAIL_LENGTH) this.gforceHistory.shift();
+                    this.drawGforceTrail();
+
+                    if (this.minimap?.hasGPSData()) this.minimap.updatePosition(this.lat, this.lng);
+                },
+
+                rebuildHistory(fromFrame) {
+                    this.speedHistory = [];
+                    this.gforceHistory = [];
+                    const start = Math.max(0, fromFrame - SPARKLINE_POINTS);
+                    for (let i = start; i <= fromFrame && i < this.telemetry.length; i++) {
+                        const d = this.telemetry[i];
+                        this.speedHistory.push((d.vehicleSpeedMps || 0) * 3.6);
+                        this.gforceHistory.push({ x: d.linearAccelerationMps2X || 0, y: d.linearAccelerationMps2Y || 0 });
+                    }
+                },
+
+                drawGforceTrail() {
+                    if (!this.gforceCtx || this.gforceHistory.length < 2) return;
+                    const ctx = this.gforceCtx, canvas = ctx.canvas;
+                    const cx = canvas.width / 2, cy = canvas.height / 2;
+                    const maxG = this.stats.maxGforce || 1.0, scale = (canvas.width / 2) * 0.9;
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.beginPath();
+                    for (let i = 0; i < this.gforceHistory.length; i++) {
+                        const p = this.gforceHistory[i];
+                        const x = cx + (p.x / 9.81 / maxG) * scale;
+                        const y = cy - (p.y / 9.81 / maxG) * scale;
+                        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                    }
+                    const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+                    grad.addColorStop(0, 'rgba(232, 33, 39, 0)');
+                    grad.addColorStop(1, 'rgba(232, 33, 39, 0.8)');
+                    ctx.strokeStyle = grad;
+                    ctx.lineWidth = 2;
+                    ctx.lineCap = 'round';
+                    ctx.stroke();
+                    for (let i = 0; i < this.gforceHistory.length; i++) {
+                        const p = this.gforceHistory[i];
+                        const x = cx + (p.x / 9.81 / maxG) * scale;
+                        const y = cy - (p.y / 9.81 / maxG) * scale;
+                        ctx.beginPath();
+                        ctx.arc(x, y, 1.5 + (i / this.gforceHistory.length) * 2.5, 0, Math.PI * 2);
+                        ctx.fillStyle = `rgba(232, 33, 39, ${(i / this.gforceHistory.length) * 0.5})`;
+                        ctx.fill();
+                    }
+                },
+
+                handleKeydown(e) {
+                    if (this.screen !== 'video') return;
+                    if (e.code === 'Space') { e.preventDefault(); this.togglePlay(); }
+                    else if (e.code === 'ArrowLeft') this.$refs.video.currentTime = Math.max(0, this.$refs.video.currentTime - 1);
+                    else if (e.code === 'ArrowRight') this.$refs.video.currentTime = Math.min(this.videoDuration, this.$refs.video.currentTime + 1);
+                    else if (e.code === 'Comma') this.stepFrame(-1);
+                    else if (e.code === 'Period') this.stepFrame(1);
+                    else if (e.code === 'BracketLeft') this.switchCamera(this.currentCameraIndex - 1);
+                    else if (e.code === 'BracketRight') this.switchCamera(this.currentCameraIndex + 1);
+                    else if (e.key >= '1' && e.key <= '9') { const i = parseInt(e.key) - 1; if (i < this.cameras.length) this.switchCamera(i); }
+                },
+
+                downloadCSV() {
+                    if (this.telemetry.length === 0) { alert('No telemetry data'); return; }
+                    const headers = ['frame_seq_no','timestamp_sec','version','gear_state','vehicle_speed_mps','accelerator_pedal_position','steering_wheel_angle','blinker_on_left','blinker_on_right','brake_applied','autopilot_state','latitude_deg','longitude_deg','heading_deg','linear_acceleration_mps2_x','linear_acceleration_mps2_y','linear_acceleration_mps2_z'];
+                    const rows = [headers.join(',')];
+                    for (let i = 0; i < this.telemetry.length; i++) {
+                        const d = this.telemetry[i], ts = this.frameTimestamps[i];
+                        rows.push([d.frameSeqNo||'',ts?.toFixed(6)||'',d.version||'',d.gearState||'',d.vehicleSpeedMps||0,d.acceleratorPedalPosition||0,d.steeringWheelAngle||0,d.blinkerOnLeft||false,d.blinkerOnRight||false,d.brakeApplied||false,d.autopilotState||'',d.latitudeDeg||0,d.longitudeDeg||0,d.headingDeg||0,d.linearAccelerationMps2X||0,d.linearAccelerationMps2Y||0,d.linearAccelerationMps2Z||0].join(','));
+                    }
+                    const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = 'telemetry_extracted.csv';
+                    link.click();
+                    URL.revokeObjectURL(link.href);
                 }
-
-                if (state.cameras.length === 0) {
-                    throw new Error('No valid telemetry data found in any file');
-                }
-
-                // Sort cameras by label for consistent ordering (Unknown goes to end)
-                const cameraOrder = ['Front', 'Left Repeater', 'Left Pillar', 'Left', 'Back', 'Rear', 'Right', 'Right Pillar', 'Right Repeater'];
-                state.cameras.sort((a, b) => {
-                    // Unknown always goes to the end
-                    if (a.label === 'Unknown' && b.label !== 'Unknown') return 1;
-                    if (b.label === 'Unknown' && a.label !== 'Unknown') return -1;
-                    if (a.label === 'Unknown' && b.label === 'Unknown') return 0;
-
-                    const aIdx = cameraOrder.findIndex(c => a.label.includes(c));
-                    const bIdx = cameraOrder.findIndex(c => b.label.includes(c));
-                    return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
-                });
-
-                // Use first camera as primary
-                const primaryCamera = getCurrentCamera();
-                video.src = primaryCamera.url;
-
-                // Wait for video metadata
-                await new Promise((resolve, reject) => {
-                    video.onloadedmetadata = resolve;
-                    video.onerror = reject;
-                });
-
-                // Show video container
-                loadingScreen.classList.remove('active');
-                videoContainer.classList.add('active');
-
-                // Update camera label
-                updateCameraLabel(primaryCamera.file.name);
-
-                // Set aspect ratio
-                const contentBox = document.getElementById('videoContentBox');
-                contentBox.style.aspectRatio = `${video.videoWidth} / ${video.videoHeight}`;
-
-                // Initialize G-Force trail canvas
-                const canvas = document.getElementById('gforceTrailCanvas');
-                gforceTrailCtx = canvas.getContext('2d');
-
-                function resizeGforceCanvas() {
-                    const container = canvas.parentElement;
-                    const size = container.offsetHeight || container.offsetWidth || 150;
-                    canvas.width = size;
-                    canvas.height = size;
-                }
-                resizeGforceCanvas();
-                window.addEventListener('resize', resizeGforceCanvas);
-
-                // Initialize GPS minimaps
-                initializeMinimaps();
-
-                // Initialize camera navigation
-                initCameraNavigation();
-
-                // Setup controls
-                initializeControls();
-                updateDisplay(0);
-                updateGforceLabels();
-                video.playbackRate = 1;
-
-            } catch (error) {
-                console.error('Error processing video:', error);
-                loadingScreen.classList.remove('active');
-                uploadScreen.style.display = 'block';
-                errorMessage.classList.add('active');
-            }
-        }
-
-        // Initialize GPS minimap
-        function initializeMinimaps() {
-            const minimapSection = document.getElementById('minimapSection');
-
-            // Create minimap instance
-            minimap = new GPSMinimap('minimap');
-            minimap.initialize();
-
-            // Build route from telemetry (use first camera with GPS data)
-            let gpsDataFound = false;
-            for (const camera of state.cameras) {
-                const hasGPS = camera.telemetry.some(f =>
-                    f.latitudeDeg && f.longitudeDeg &&
-                    (f.latitudeDeg !== 0 || f.longitudeDeg !== 0)
-                );
-                if (hasGPS) {
-                    gpsDataFound = minimap.buildRoute(camera.telemetry);
-                    break;
-                }
-            }
-
-            // Show/hide map tab based on GPS data
-            const mapTab = document.getElementById('mapTab');
-            if (gpsDataFound) {
-                minimapSection.classList.remove('no-gps');
-                mapTab.classList.remove('hidden');
-            } else {
-                minimapSection.classList.add('no-gps');
-                mapTab.classList.add('hidden');
-            }
-        }
-
-        let animationFrameId = null;
-
-        function initializeControls() {
-            // Set scrubber max to video duration
-            scrubber.max = video.duration;
-
-            // Update time display
-            updateTimeDisplay();
-
-            // Use requestAnimationFrame for smooth 60fps updates
-            function frameLoop() {
-                const frame = findFrameAtTime(video.currentTime);
-
-                // Only update DOM if frame changed (performance optimization)
-                if (frame !== state.lastDisplayedFrame) {
-                    updateDisplay(frame);
-                    state.lastDisplayedFrame = frame;
-                }
-
-                // Always update scrubber and time for smooth seeking
-                scrubber.value = video.currentTime;
-                updateTimeDisplay();
-
-                animationFrameId = requestAnimationFrame(frameLoop);
-            }
-
-            // Start/stop animation loop based on video state
-            video.addEventListener('play', () => {
-                if (!animationFrameId) {
-                    frameLoop();
-                }
-            });
-
-            video.addEventListener('pause', () => {
-                if (animationFrameId) {
-                    cancelAnimationFrame(animationFrameId);
-                    animationFrameId = null;
-                }
-                // Update one last time to ensure correct frame shown
-                const frame = findFrameAtTime(video.currentTime);
-                updateDisplay(frame);
-                scrubber.value = video.currentTime;
-                updateTimeDisplay();
-            });
-
-            // Also update on seek (when paused)
-            video.addEventListener('seeked', () => {
-                const frame = findFrameAtTime(video.currentTime);
-                updateDisplay(frame);
-                state.lastDisplayedFrame = frame;
-                scrubber.value = video.currentTime;
-                updateTimeDisplay();
-
-                // Reset history on seek
-                rebuildHistory(frame);
-            });
-
-            // Play ended
-            video.addEventListener('ended', () => {
-                playBtn.innerHTML = playSvg;
-                if (animationFrameId) {
-                    cancelAnimationFrame(animationFrameId);
-                    animationFrameId = null;
-                }
-            });
-        }
-
-        function findFrameAtTime(time) {
-            const timestamps = getFrameTimestamps();
-            const telemetry = getTelemetry();
-
-            // Binary search for frame at given time
-            let low = 0;
-            let high = timestamps.length - 1;
-
-            while (low < high) {
-                const mid = Math.floor((low + high + 1) / 2);
-                if (timestamps[mid] <= time) {
-                    low = mid;
-                } else {
-                    high = mid - 1;
-                }
-            }
-
-            // Clamp to telemetry data length
-            return Math.min(low, telemetry.length - 1);
-        }
-
-        function updateDisplay(frameIndex) {
-            setCurrentFrame(frameIndex);
-            const data = getCurrentFrameData();
-            if (!data) return;
-
-            const stats = getSessionStats();
-
-            // Speed (m/s to km/h or mph)
-            const speedKmh = (data.vehicleSpeedMps || 0) * 3.6;
-            const displaySpeed = state.useMetric ? speedKmh : speedKmh * 0.621371;
-            const speedElement = document.getElementById('speedValue');
-            speedElement.textContent = displaySpeed.toFixed(1);
-
-            // Dynamic speed coloring (green at min, red at max)
-            const speedRange = stats.maxSpeed - stats.minSpeed;
-            const speedNormalized = speedRange > 0 ? (speedKmh - stats.minSpeed) / speedRange : 0;
-            speedElement.style.color = getSpeedColor(speedNormalized);
-
-            // Update speed history
-            addSpeedToHistory(speedKmh);
-            updateSparkline();
-
-            // G-Force
-            const gX = data.linearAccelerationMps2X || 0;
-            const gY = data.linearAccelerationMps2Y || 0;
-            const gZ = data.linearAccelerationMps2Z || 0;
-
-            // Update raw g-force values display
-            document.getElementById('gforceRawX').textContent = (gX / 9.81).toFixed(4) + 'g';
-            document.getElementById('gforceRawY').textContent = (gY / 9.81).toFixed(4) + 'g';
-            document.getElementById('gforceRawZ').textContent = (gZ / 9.81).toFixed(4) + 'g';
-
-            // Update G-Force history
-            addGforceToHistory(gX, gY);
-            drawGforceTrail();
-
-            // Scale dot position to session max G-force
-            const maxG = stats.maxGforce || 1.0;
-            const dotX = 50 + (gX / 9.81 / maxG) * 45;
-            const dotY = 50 - (gY / 9.81 / maxG) * 45;
-
-            const gforceDot = document.getElementById('gforceDot');
-            gforceDot.style.left = `${Math.max(5, Math.min(95, dotX))}%`;
-            gforceDot.style.top = `${Math.max(5, Math.min(95, dotY))}%`;
-
-            // Throttle (actual pedal position 0-100%)
-            const throttleRaw = data.acceleratorPedalPosition || 0;
-            // acceleratorPedalPosition is typically 0-100, clamp to be safe
-            const throttle = Math.min(Math.max(throttleRaw, 0), 100);
-            document.getElementById('throttleBar').style.height = `${throttle}%`;
-
-            // Brake (boolean: on = 100%, off = 0%)
-            const brakeOn = data.brakeApplied === true;
-            document.getElementById('brakeBar').style.height = brakeOn ? '100%' : '0%';
-
-            // Autopilot
-            const apState = data.autopilotState || 'NONE';
-            const apIndicatorHud = document.getElementById('apIndicatorHud');
-            const apStatusHud = document.getElementById('apStatusHud');
-
-            if (apState === 'AUTOSTEER' || apState === 'SELF_DRIVING') {
-                apIndicatorHud.className = 'status-indicator active';
-                apStatusHud.textContent = apState === 'AUTOSTEER' ? 'AUTOSTEER' : 'FSD';
-            } else if (apState === 'TACC') {
-                apIndicatorHud.className = 'status-indicator active';
-                apStatusHud.textContent = 'TACC';
-            } else {
-                apIndicatorHud.className = 'status-indicator inactive';
-                apStatusHud.textContent = 'OFF';
-            }
-
-            // Gear
-            const gear = data.gearState || 'GEAR_DRIVE';
-            const gearMap = {
-                'GEAR_PARK': 'P',
-                'GEAR_DRIVE': 'D',
-                'GEAR_REVERSE': 'R',
-                'GEAR_NEUTRAL': 'N'
             };
-            document.getElementById('gearStatus').textContent = gearMap[gear] || 'D';
-
-            // Steering
-            document.getElementById('steeringValue').textContent = (data.steeringWheelAngle || 0).toFixed(1);
-
-            // Frame info
-            document.getElementById('frameInfo').textContent = `${frameIndex + 1} / ${getTelemetry().length}`;
-
-            // Location
-            const lat = data.latitudeDeg || 0;
-            const lng = data.longitudeDeg || 0;
-            if (lat !== 0 || lng !== 0) {
-                document.getElementById('locationInfo').textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-            }
-
-            // Update GPS minimap
-            if (minimap && minimap.hasGPSData()) {
-                minimap.updatePosition(lat, lng, data.headingDeg || 0);
-            }
-        }
-
-        function updateSparkline() {
-            if (state.speedHistory.length < 2) return;
-
-            const pathElement = document.getElementById('sparklinePath');
-            const areaElement = document.getElementById('sparklineArea');
-
-            const width = 200;
-            const height = 40;
-            const padding = 2;
-
-            // Use session-wide min/max for scaling
-            const stats = getSessionStats();
-            const speedRange = stats.maxSpeed - stats.minSpeed;
-
-            // Generate path points (scaled between session min and max)
-            const points = state.speedHistory.map((speed, i) => {
-                const x = padding + (i / (SPARKLINE_POINTS - 1)) * (width - padding * 2);
-                // Normalize speed to 0-1 range based on session min/max
-                const normalizedSpeed = speedRange > 0 ? (speed - stats.minSpeed) / speedRange : 0.5;
-                const y = height - padding - normalizedSpeed * (height - padding * 2);
-                return { x, y };
-            });
-
-            // Create smooth curve using cardinal spline
-            const linePath = `M ${points.map(p => `${p.x},${p.y}`).join(' L ')}`;
-            const areaPath = `${linePath} L ${points[points.length - 1].x},${height} L ${points[0].x},${height} Z`;
-
-            pathElement.setAttribute('d', linePath);
-            areaElement.setAttribute('d', areaPath);
-
-            // Update gradient based on current speed
-            const currentSpeed = state.speedHistory[state.speedHistory.length - 1] || 0;
-            const gradient = document.getElementById('sparklineGradient');
-
-            // Shift gradient colors based on speed
-            if (currentSpeed < 40) {
-                gradient.innerHTML = `
-                    <stop offset="0%" stop-color="rgba(255,255,255,0.3)" />
-                    <stop offset="100%" stop-color="#fff" />
-                `;
-            } else if (currentSpeed < 80) {
-                gradient.innerHTML = `
-                    <stop offset="0%" stop-color="rgba(255,255,255,0.3)" />
-                    <stop offset="100%" stop-color="#fbbf24" />
-                `;
-            } else if (currentSpeed < 120) {
-                gradient.innerHTML = `
-                    <stop offset="0%" stop-color="rgba(251,191,36,0.3)" />
-                    <stop offset="100%" stop-color="#f97316" />
-                `;
-            } else {
-                gradient.innerHTML = `
-                    <stop offset="0%" stop-color="rgba(249,115,22,0.3)" />
-                    <stop offset="100%" stop-color="#ef4444" />
-                `;
-            }
-        }
-
-        function updateGforceLabels() {
-            const stats = getSessionStats();
-            const maxG = stats.maxGforce || 1.0;
-
-            // Labels at 33%, 66%, and 100% of maxG
-            const label1 = (maxG / 3).toFixed(1);
-            const label2 = ((maxG * 2) / 3).toFixed(1);
-            const label3 = maxG.toFixed(1);
-
-            document.getElementById('gforceLabel1').textContent = label1 + 'g';
-            document.getElementById('gforceLabel2').textContent = label2 + 'g';
-            document.getElementById('gforceLabel3').textContent = label3 + 'g';
-        }
-
-        function drawGforceTrail() {
-            if (!gforceTrailCtx || state.gforceHistory.length < 2) return;
-
-            const canvas = gforceTrailCtx.canvas;
-            const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2;
-            const stats = getSessionStats();
-            const maxG = stats.maxGforce || 1.0;
-            const scale = (canvas.width / 2) * 0.9; // 90% of radius
-
-            // Clear canvas
-            gforceTrailCtx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Draw trail
-            gforceTrailCtx.beginPath();
-
-            for (let i = 0; i < state.gforceHistory.length; i++) {
-                const point = state.gforceHistory[i];
-                const x = centerX + (point.x / 9.81 / maxG) * scale;
-                const y = centerY - (point.y / 9.81 / maxG) * scale;
-
-                if (i === 0) {
-                    gforceTrailCtx.moveTo(x, y);
-                } else {
-                    gforceTrailCtx.lineTo(x, y);
-                }
-            }
-
-            // Create gradient for trail (fading from transparent to red)
-            const gradient = gforceTrailCtx.createLinearGradient(0, 0, canvas.width, canvas.height);
-            gradient.addColorStop(0, 'rgba(232, 33, 39, 0)');
-            gradient.addColorStop(1, 'rgba(232, 33, 39, 0.8)');
-
-            gforceTrailCtx.strokeStyle = gradient;
-            gforceTrailCtx.lineWidth = 2;
-            gforceTrailCtx.lineCap = 'round';
-            gforceTrailCtx.lineJoin = 'round';
-            gforceTrailCtx.stroke();
-
-            // Draw fading dots along the trail
-            for (let i = 0; i < state.gforceHistory.length; i++) {
-                const point = state.gforceHistory[i];
-                const x = centerX + (point.x / 9.81 / maxG) * scale;
-                const y = centerY - (point.y / 9.81 / maxG) * scale;
-
-                const alpha = (i / state.gforceHistory.length) * 0.5;
-                const radius = 1.5 + (i / state.gforceHistory.length) * 2.5;
-
-                gforceTrailCtx.beginPath();
-                gforceTrailCtx.arc(x, y, radius, 0, Math.PI * 2);
-                gforceTrailCtx.fillStyle = `rgba(232, 33, 39, ${alpha})`;
-                gforceTrailCtx.fill();
-            }
-        }
-
-        function formatTime(seconds) {
-            const mins = Math.floor(seconds / 60);
-            const secs = Math.floor(seconds % 60);
-            return `${mins}:${secs.toString().padStart(2, '0')}`;
-        }
-
-        function updateTimeDisplay() {
-            const current = formatTime(video.currentTime);
-            const total = formatTime(video.duration);
-            document.getElementById('timeDisplay').textContent = `${current} / ${total}`;
-        }
-
-        // Interpolate color from green (0) through yellow (0.5) to red (1)
-        function getSpeedColor(normalized) {
-            const t = Math.max(0, Math.min(1, normalized));
-
-            // Green -> Yellow -> Red gradient
-            let r, g, b;
-            if (t < 0.5) {
-                // Green to Yellow (0 to 0.5)
-                const t2 = t * 2;
-                r = Math.round(34 + (251 - 34) * t2);   // 34 -> 251
-                g = Math.round(197 + (191 - 197) * t2); // 197 -> 191
-                b = Math.round(94 + (36 - 94) * t2);    // 94 -> 36
-            } else {
-                // Yellow to Red (0.5 to 1)
-                const t2 = (t - 0.5) * 2;
-                r = Math.round(251 + (239 - 251) * t2); // 251 -> 239
-                g = Math.round(191 + (68 - 191) * t2);  // 191 -> 68
-                b = Math.round(36 + (68 - 36) * t2);    // 36 -> 68
-            }
-
-            return `rgb(${r}, ${g}, ${b})`;
-        }
-
-        // SVG icons for play/pause
-        const playSvg = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
-        const pauseSvg = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
-
-        // Playback controls
-        playBtn.addEventListener('click', () => {
-            if (video.paused) {
-                video.play();
-                playBtn.innerHTML = pauseSvg;
-            } else {
-                video.pause();
-                playBtn.innerHTML = playSvg;
-            }
-        });
-
-        // Frame stepping (TeslaCam records at ~36fps, use 1/30 as safe default)
-        const frameTime = 1 / 30;
-        const prevFrameBtn = document.getElementById('prevFrameBtn');
-        const nextFrameBtn = document.getElementById('nextFrameBtn');
-
-        prevFrameBtn.addEventListener('click', () => {
-            video.pause();
-            playBtn.innerHTML = playSvg;
-            video.currentTime = Math.max(0, video.currentTime - frameTime);
-        });
-
-        nextFrameBtn.addEventListener('click', () => {
-            video.pause();
-            playBtn.innerHTML = playSvg;
-            video.currentTime = Math.min(video.duration || 0, video.currentTime + frameTime);
-        });
-
-        scrubber.addEventListener('input', (e) => {
-            video.currentTime = parseFloat(e.target.value);
-        });
-
-
-        // Keyboard controls
-        document.addEventListener('keydown', (e) => {
-            if (e.code === 'Space') {
-                e.preventDefault();
-                playBtn.click();
-            } else if (e.code === 'ArrowLeft') {
-                video.currentTime = Math.max(0, video.currentTime - 1);
-            } else if (e.code === 'ArrowRight') {
-                video.currentTime = Math.min(video.duration, video.currentTime + 1);
-            } else if (e.code === 'Comma') {
-                prevFrameBtn.click();
-            } else if (e.code === 'Period') {
-                nextFrameBtn.click();
-            } else if (e.code === 'BracketLeft') {
-                // [ key - previous camera
-                switchCamera(state.currentCameraIndex - 1);
-            } else if (e.code === 'BracketRight') {
-                // ] key - next camera
-                switchCamera(state.currentCameraIndex + 1);
-            } else if (e.key >= '1' && e.key <= '9') {
-                // Number keys 1-9 - switch to camera by index
-                const camIndex = parseInt(e.key) - 1;
-                if (camIndex < state.cameras.length) {
-                    switchCamera(camIndex);
-                }
-            }
-        });
-
-        // Drawer toggle
-        const drawerToggle = document.getElementById('drawerToggle');
-        const drawerContainer = document.getElementById('drawerContainer');
-
-        drawerToggle.addEventListener('click', () => {
-            drawerToggle.classList.toggle('open');
-            drawerContainer.classList.toggle('open');
-        });
-
-        // Tab switching
-        const drawerTabs = document.querySelectorAll('.drawer-tab');
-        const tabPanels = document.querySelectorAll('.tab-panel');
-
-        function switchTab(tabName) {
-            // Update tab buttons
-            drawerTabs.forEach(tab => {
-                tab.classList.toggle('active', tab.dataset.tab === tabName);
-            });
-
-            // Update tab panels
-            tabPanels.forEach(panel => {
-                panel.classList.toggle('active', panel.dataset.tab === tabName);
-            });
-
-            // Handle Leaflet map resize when Map tab becomes visible
-            if (tabName === 'map' && minimap && minimap.map) {
-                setTimeout(() => {
-                    minimap.map.invalidateSize();
-                    if (minimap.routeBounds) {
-                        minimap.map.fitBounds(minimap.routeBounds, { padding: [15, 15] });
-                    }
-                }, 50);
-            }
-
-            // Handle G-Force canvas resize
-            if (tabName === 'gforce') {
-                const canvas = document.getElementById('gforceTrailCanvas');
-                if (canvas && gforceTrailCtx) {
-                    const container = canvas.parentElement;
-                    const size = container.offsetHeight || container.offsetWidth || 80;
-                    canvas.width = size;
-                    canvas.height = size;
-                    drawGforceTrail();
-                }
-            }
-        }
-
-        drawerTabs.forEach(tab => {
-            tab.addEventListener('click', () => switchTab(tab.dataset.tab));
-        });
-
-        // Speed unit toggle
-        document.getElementById('speedDisplay').addEventListener('click', () => {
-            state.useMetric = !state.useMetric;
-            document.getElementById('speedUnit').textContent = state.useMetric ? 'KM/H' : 'MPH';
-            // Update display with current frame data
-            if (getTelemetry().length > 0) {
-                updateDisplay(state.currentFrame);
-            }
-        });
-
-        // CSV Download
-        document.getElementById('downloadBtn').addEventListener('click', downloadCSV);
-
-        function downloadCSV() {
-            const telemetry = getTelemetry();
-            const timestamps = getFrameTimestamps();
-
-            if (telemetry.length === 0) {
-                alert('No telemetry data to export');
-                return;
-            }
-
-            // CSV headers matching Tesla's official output format
-            const headers = [
-                'frame_seq_no',
-                'timestamp_sec',
-                'version',
-                'gear_state',
-                'vehicle_speed_mps',
-                'accelerator_pedal_position',
-                'steering_wheel_angle',
-                'blinker_on_left',
-                'blinker_on_right',
-                'brake_applied',
-                'autopilot_state',
-                'latitude_deg',
-                'longitude_deg',
-                'heading_deg',
-                'linear_acceleration_mps2_x',
-                'linear_acceleration_mps2_y',
-                'linear_acceleration_mps2_z'
-            ];
-
-            // Build CSV rows
-            const rows = [headers.join(',')];
-
-            for (let i = 0; i < telemetry.length; i++) {
-                const d = telemetry[i];
-                const timestamp = timestamps[i] !== undefined ? timestamps[i].toFixed(6) : '';
-
-                const row = [
-                    d.frameSeqNo || '',
-                    timestamp,
-                    d.version || '',
-                    d.gearState || '',
-                    d.vehicleSpeedMps || 0,
-                    d.acceleratorPedalPosition || 0,
-                    d.steeringWheelAngle || 0,
-                    d.blinkerOnLeft || false,
-                    d.blinkerOnRight || false,
-                    d.brakeApplied || false,
-                    d.autopilotState || '',
-                    d.latitudeDeg || 0,
-                    d.longitudeDeg || 0,
-                    d.headingDeg || 0,
-                    d.linearAccelerationMps2X || 0,
-                    d.linearAccelerationMps2Y || 0,
-                    d.linearAccelerationMps2Z || 0
-                ];
-
-                rows.push(row.join(','));
-            }
-
-            // Create and download file
-            const csvContent = rows.join('\n');
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = 'telemetry_extracted.csv';
-            link.click();
-
-            URL.revokeObjectURL(url);
         }
     </script>
 </body>
