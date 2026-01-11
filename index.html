@@ -377,28 +377,13 @@
             letter-spacing: 1px;
         }
 
-        /* Speed Sparkline */
-        .speed-sparkline-container {
-            margin-top: clamp(4px, 1.5vw, 8px);
-            height: clamp(30px, 8vw, 50px);
-            position: relative;
-        }
-
-        .speed-sparkline {
-            width: 100%;
-            height: 100%;
-        }
-
+        /* Speed Sparkline Path Styles */
         .speed-sparkline-path {
             fill: none;
-            stroke-width: 2.5;
+            stroke-width: 2;
             stroke-linecap: round;
             stroke-linejoin: round;
         }
-
-        .speed-sparkline-gradient-low { stop-color: #fff; }
-        .speed-sparkline-gradient-mid { stop-color: #fbbf24; }
-        .speed-sparkline-gradient-high { stop-color: #ef4444; }
 
         .speed-sparkline-area {
             opacity: 0.25;
@@ -766,7 +751,7 @@
         }
 
         .drawer-container.open {
-            max-height: 280px;
+            max-height: 400px;
         }
 
         /* Drawer Tabs */
@@ -814,7 +799,7 @@
         .drawer-content {
             padding: 16px 20px;
             position: relative;
-            max-height: 240px;
+            max-height: 360px;
             overflow-y: auto;
         }
 
@@ -971,14 +956,97 @@
 
         /* Drawer Sparkline */
         .drawer-sparkline-container {
-            height: 60px;
+            display: flex;
+            gap: 8px;
+            min-height: 120px;
+            height: 140px;
             width: 100%;
-            max-width: 400px;
+            max-width: 500px;
+            flex-shrink: 0;
         }
 
-        .drawer-sparkline-container .speed-sparkline {
+        .sparkline-y-axis {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+
+        .sparkline-unit {
+            font-size: 0.55rem;
+            color: var(--text-muted);
+            writing-mode: vertical-rl;
+            transform: rotate(180deg);
+            font-family: 'SF Mono', Monaco, monospace;
+        }
+
+        .sparkline-y-labels {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 100%;
+            padding: 2px 0;
+            font-size: 0.6rem;
+            color: var(--text-muted);
+            font-family: 'SF Mono', Monaco, monospace;
+            text-align: right;
+            min-width: 24px;
+        }
+
+        .sparkline-chart-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .sparkline-chart {
+            flex: 1;
+            position: relative;
+            border-left: 1px solid var(--border-white-light);
+            border-bottom: 1px solid var(--border-white-light);
+        }
+
+        .sparkline-chart .speed-sparkline {
             width: 100%;
             height: 100%;
+            display: block;
+        }
+
+        .sparkline-gridline {
+            stroke: var(--border-white-dim);
+            stroke-width: 0.5;
+            stroke-dasharray: 2, 2;
+        }
+
+        .sparkline-current-line {
+            stroke: var(--tesla-red);
+            stroke-width: 1.5;
+            stroke-dasharray: 3, 2;
+        }
+
+        .sparkline-current-dot {
+            fill: var(--tesla-red);
+        }
+
+        .sparkline-chart .sparkline-current-label {
+            position: absolute;
+            top: -2px;
+            transform: translateX(-50%) translateY(-100%);
+            font-size: 0.65rem;
+            color: var(--tesla-red);
+            font-family: 'SF Mono', Monaco, monospace;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .sparkline-x-labels {
+            display: flex;
+            justify-content: space-between;
+            padding-top: 4px;
+            font-size: 0.55rem;
+            color: var(--text-muted);
+            font-family: 'SF Mono', Monaco, monospace;
         }
 
         /* ============================================ */
@@ -1297,17 +1365,50 @@
                 <!-- Speed History Tab -->
                 <div class="tab-panel" :class="{ active: activeTab === 'speed' }">
                     <div class="drawer-sparkline-container">
-                        <svg class="speed-sparkline" viewBox="0 0 200 40" preserveAspectRatio="none">
-                            <defs>
-                                <linearGradient id="sparklineGradient" x1="0%" y1="0%" x2="100%" y2="0%" x-html="sparklineGradientStops"></linearGradient>
-                                <linearGradient id="sparklineAreaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                                    <stop offset="0%" stop-color="#fff" stop-opacity="0.3" />
-                                    <stop offset="100%" stop-color="#fff" stop-opacity="0" />
-                                </linearGradient>
-                            </defs>
-                            <path class="speed-sparkline-area" :d="sparklineAreaPath" fill="url(#sparklineAreaGradient)" />
-                            <path class="speed-sparkline-path" :d="sparklinePath" stroke="url(#sparklineGradient)" />
-                        </svg>
+                        <!-- Y-axis labels (HTML) -->
+                        <div class="sparkline-y-axis">
+                            <span class="sparkline-unit" x-text="useMetric ? 'km/h' : 'mph'"></span>
+                            <div class="sparkline-y-labels">
+                                <span x-text="sparklineMaxLabel"></span>
+                                <span x-text="sparklineMidLabel"></span>
+                                <span x-text="sparklineMinLabel"></span>
+                            </div>
+                        </div>
+                        <!-- Chart area -->
+                        <div class="sparkline-chart-wrapper">
+                            <div class="sparkline-chart">
+                                <svg class="speed-sparkline" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                    <defs>
+                                        <linearGradient id="sparklineGradient" x1="0%" y1="0%" x2="100%" y2="0%" x-html="sparklineGradientStops"></linearGradient>
+                                        <linearGradient id="sparklineAreaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                            <stop offset="0%" stop-color="#fff" stop-opacity="0.3" />
+                                            <stop offset="100%" stop-color="#fff" stop-opacity="0" />
+                                        </linearGradient>
+                                    </defs>
+                                    <!-- Gridlines (with 8% padding top/bottom) -->
+                                    <line class="sparkline-gridline" x1="0" y1="8" x2="100" y2="8" />
+                                    <line class="sparkline-gridline" x1="0" y1="50" x2="100" y2="50" />
+                                    <line class="sparkline-gridline" x1="0" y1="92" x2="100" y2="92" />
+                                    <!-- Chart paths -->
+                                    <path class="speed-sparkline-area" :d="sparklineAreaPath" fill="url(#sparklineAreaGradient)" />
+                                    <path class="speed-sparkline-path" :d="sparklinePath" stroke="url(#sparklineGradient)" />
+                                    <!-- Current value indicator line and dot -->
+                                    <template x-if="speedHistory.length > 0">
+                                        <g>
+                                            <line class="sparkline-current-line" :x1="sparklineCurrentX" y1="0" :x2="sparklineCurrentX" y2="100" />
+                                            <circle class="sparkline-current-dot" :cx="sparklineCurrentX" :cy="sparklineCurrentY" r="3" />
+                                        </g>
+                                    </template>
+                                </svg>
+                                <!-- Current value label (HTML, positioned) -->
+                                <span class="sparkline-current-label" :style="{ left: sparklineCurrentX + '%' }" x-text="sparklineCurrentValue" x-show="speedHistory.length > 0"></span>
+                            </div>
+                            <!-- X-axis labels -->
+                            <div class="sparkline-x-labels">
+                                <span x-text="sparklineTimeStart"></span>
+                                <span>Now</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -1703,11 +1804,12 @@
 
                 get sparklinePath() {
                     if (this.speedHistory.length < 2) return '';
-                    const w = 200, h = 40, p = 2, range = this.stats.maxSpeed - this.stats.minSpeed;
+                    const range = this.stats.maxSpeed - this.stats.minSpeed;
+                    const pad = 8; // padding top/bottom
                     const pts = this.speedHistory.map((s, i) => {
-                        const x = p + (i / (SPARKLINE_POINTS - 1)) * (w - p * 2);
+                        const x = (i / (SPARKLINE_POINTS - 1)) * 100;
                         const norm = range > 0 ? (s - this.stats.minSpeed) / range : 0.5;
-                        const y = h - p - norm * (h - p * 2);
+                        const y = pad + (1 - norm) * (100 - pad * 2);
                         return `${x},${y}`;
                     });
                     return `M ${pts.join(' L ')}`;
@@ -1715,8 +1817,8 @@
 
                 get sparklineAreaPath() {
                     if (this.speedHistory.length < 2) return '';
-                    const w = 200, h = 40;
-                    return `${this.sparklinePath} L ${w - 2},${h} L 2,${h} Z`;
+                    const pad = 8;
+                    return `${this.sparklinePath} L 100,${100 - pad} L 0,${100 - pad} Z`;
                 },
 
                 get sparklineGradientStops() {
@@ -1725,6 +1827,49 @@
                     if (s < 80) return '<stop offset="0%" stop-color="rgba(255,255,255,0.3)"/><stop offset="100%" stop-color="#fbbf24"/>';
                     if (s < 120) return '<stop offset="0%" stop-color="rgba(251,191,36,0.3)"/><stop offset="100%" stop-color="#f97316"/>';
                     return '<stop offset="0%" stop-color="rgba(249,115,22,0.3)"/><stop offset="100%" stop-color="#ef4444"/>';
+                },
+
+                // Sparkline axis labels
+                get sparklineMaxLabel() {
+                    const maxSpeed = this.useMetric ? this.stats.maxSpeed : this.stats.maxSpeed * 0.621371;
+                    return Math.round(maxSpeed);
+                },
+
+                get sparklineMidLabel() {
+                    const midSpeed = (this.stats.maxSpeed + this.stats.minSpeed) / 2;
+                    const displaySpeed = this.useMetric ? midSpeed : midSpeed * 0.621371;
+                    return Math.round(displaySpeed);
+                },
+
+                get sparklineMinLabel() {
+                    const minSpeed = this.useMetric ? this.stats.minSpeed : this.stats.minSpeed * 0.621371;
+                    return Math.round(minSpeed);
+                },
+
+                get sparklineTimeStart() {
+                    const secondsAgo = Math.round(SPARKLINE_POINTS / 30); // Assuming ~30fps
+                    return `-${secondsAgo}s`;
+                },
+
+                // Current value indicator position (0-100 scale)
+                get sparklineCurrentX() {
+                    if (this.speedHistory.length === 0) return 0;
+                    return ((this.speedHistory.length - 1) / (SPARKLINE_POINTS - 1)) * 100;
+                },
+
+                get sparklineCurrentY() {
+                    if (this.speedHistory.length === 0) return 50;
+                    const range = this.stats.maxSpeed - this.stats.minSpeed;
+                    const pad = 8;
+                    const currentSpeed = this.speedHistory[this.speedHistory.length - 1] || 0;
+                    const norm = range > 0 ? (currentSpeed - this.stats.minSpeed) / range : 0.5;
+                    return pad + (1 - norm) * (100 - pad * 2);
+                },
+
+                get sparklineCurrentValue() {
+                    const currentSpeed = this.speedHistory[this.speedHistory.length - 1] || 0;
+                    const displaySpeed = this.useMetric ? currentSpeed : currentSpeed * 0.621371;
+                    return Math.round(displaySpeed);
                 },
 
                 // Event handlers
